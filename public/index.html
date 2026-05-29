@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Clone Pipeline</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>AI Clone Pipeline</h1>
+      <p>Module 1 · Kling clip planner</p>
+    </div>
+    <button id="refreshButton" class="iconButton" title="Refresh data" aria-label="Refresh data">↻</button>
+  </header>
+
+  <main class="workspace">
+    <section class="panel characterPanel">
+      <div class="panelHeader">
+        <h2>Character</h2>
+        <div class="segmented" role="tablist" aria-label="Character mode">
+          <button id="selectMode" class="active" type="button">Select</button>
+          <button id="createMode" type="button">Create</button>
+        </div>
+      </div>
+
+      <div id="selectCharacterView" class="stack">
+        <label>
+          Existing character
+          <select id="characterSelect"></select>
+        </label>
+        <dl id="characterDetails" class="details"></dl>
+      </div>
+
+      <form id="createCharacterForm" class="stack hidden">
+        <label>
+          Name
+          <input id="newCharacterName" name="display_name" autocomplete="off" placeholder="Demo Presenter" />
+        </label>
+        <label>
+          Voice recording
+          <input id="newVoiceSample" name="voice_sample" type="file" accept="audio/*" />
+        </label>
+        <label>
+          Character images
+          <input id="newCharacterImages" name="images" type="file" accept="image/*" multiple />
+        </label>
+        <div class="hint">Upload the clean voice sample and roughly 30 images. For the demo, files are stored locally under <code>uploads/characters/</code>.</div>
+        <button class="primary" type="submit">Create character</button>
+      </form>
+    </section>
+
+    <section class="panel promptPanel">
+      <div class="panelHeader generationHeader">
+        <h2>Generation</h2>
+        <label class="aspectControl">
+          Aspect ratio
+          <select id="aspectRatio">
+            <option value="16:9">16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="1:1">1:1</option>
+          </select>
+        </label>
+      </div>
+
+      <form id="runForm" class="stack">
+        <label>
+          Prompt
+          <textarea id="prompt" rows="10">Create a confident presenter clip for an internal AI clone demo.</textarea>
+        </label>
+
+        <div class="actions">
+          <button class="primary" type="submit">Generate plan</button>
+          <button id="clearResult" type="button">Clear</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel resultPanel">
+      <div class="panelHeader">
+        <h2>Clip Plan</h2>
+        <span id="statusPill" class="pill">No run</span>
+      </div>
+      <div id="resultSummary" class="emptyState">Generate a clip plan to create the Module 1 manifest.</div>
+      <div id="clipList" class="clipList"></div>
+    </section>
+
+    <section class="panel historyPanel">
+      <div class="panelHeader">
+        <h2>Runs</h2>
+        <button id="refreshRuns" class="smallButton" type="button">Refresh</button>
+      </div>
+      <div id="runList" class="runList"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

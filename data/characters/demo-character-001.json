@@ -1,0 +1,12 @@
+{
+  "id": "demo-character-001",
+  "display_name": "Demo Character",
+  "consent_status": "demo-placeholder",
+  "kling_element_id": null,
+  "kling_voice_id": null,
+  "reference_images": [
+    "https://example.com/character/front.jpg",
+    "https://example.com/character/side.jpg",
+    "https://example.com/character/smile.jpg"
+  ]
+}

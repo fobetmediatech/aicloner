@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: ai-clone-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ai_clone_root
+      MYSQL_DATABASE: ai_clone
+      MYSQL_USER: ai_clone
+      MYSQL_PASSWORD: ai_clone_dev
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./schema/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql_data:
