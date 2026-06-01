@@ -9,6 +9,7 @@ import { rewritePromptWithGemini } from "../module1/gemini/rewrite.js";
 import { resolveCharacter } from "../module1/characters/registry.js";
 import { buildOmniVideoPayload } from "../module1/kling/payload.js";
 import { KlingClient, extractTaskId, extractTaskStatus, extractVideoUrl } from "../module1/kling/client.js";
+import { buildInfluencerVideoPrompt } from "../influencer/visual-pipeline.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -72,6 +73,12 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/module1/generate-video" && req.method === "POST") {
       const body = await readJson(req);
       const result = await createSingleKlingVideoTask(body);
+      return json(res, result, 201);
+    }
+
+    if (url.pathname === "/api/influencer/expand-prompt" && req.method === "POST") {
+      const body = await readJson(req);
+      const result = await expandInfluencerPrompt(body);
       return json(res, result, 201);
     }
 
@@ -170,6 +177,29 @@ async function createSingleKlingVideoTask(body) {
     request,
     create_response: createResponse
   };
+}
+
+async function expandInfluencerPrompt(body) {
+  const characterId = requiredText(body.character_id, "character_id");
+  const brief = requiredText(body.prompt, "prompt");
+  const character = await loadCharacterDraft(characterId);
+
+  return buildInfluencerVideoPrompt({
+    character,
+    brief,
+    aspectRatio: body.aspect_ratio || "9:16"
+  });
+}
+
+async function loadCharacterDraft(characterId) {
+  const safeId = slug(characterId);
+  if (safeId !== characterId) {
+    const error = new Error("Invalid character_id");
+    error.statusCode = 400;
+    throw error;
+  }
+  const characterPath = safeJoin(characterDir, `${safeId}.json`);
+  return JSON.parse(await readFile(characterPath, "utf8"));
 }
 
 async function loadDirectorInstruction() {

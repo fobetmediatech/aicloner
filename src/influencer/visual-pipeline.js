@@ -166,6 +166,78 @@ export function buildVideoPrompts(config) {
   });
 }
 
+export function buildInfluencerVideoPrompt({ character, brief, aspectRatio = "9:16" } = {}) {
+  const promptBrief = String(brief || "").trim();
+  if (!promptBrief) {
+    throw new Error("Missing basic prompt for influencer video");
+  }
+
+  const identity = character?.visual_identity || {};
+  const identityText = [
+    character?.display_name || character?.id || "selected influencer",
+    character?.persona,
+    identity.age_range,
+    identity.presentation,
+    identity.face,
+    identity.hair,
+    identity.wardrobe,
+    identity.brand_style
+  ].filter(Boolean).join(", ");
+
+  const shots = [
+    {
+      time: "0-2s",
+      framing: "Medium shot, waist up, subject begins the idea naturally, face sharp and fully visible",
+      camera_motion: "gentle handheld warmth, subtle push-in"
+    },
+    {
+      time: "2-4s",
+      framing: "Medium close-up, chest up, direct eye contact with camera, expressive speaking face",
+      camera_motion: "locked medium close-up, slight rack focus toward the eyes"
+    },
+    {
+      time: "4-6s",
+      framing: "Close-up on face, cinematic key light, natural hair movement, lips and eyes clear",
+      camera_motion: "locked close-up, face in sharp focus throughout"
+    },
+    {
+      time: "6-8s",
+      framing: "Side profile medium close-up, subject briefly looks away then returns attention",
+      camera_motion: "slow controlled pan following profile, staying tight on face"
+    },
+    {
+      time: "8-10s",
+      framing: "Front-facing medium close-up, confident soft smile, face fully lit",
+      camera_motion: "static medium close-up, slow subtle zoom in"
+    }
+  ];
+
+  const dialogue = buildDialogueFromBrief(promptBrief);
+  const prompt = [
+    "10 second cinematic vertical influencer video, multiple camera angles, all shots medium to close-up only, no wide shots, face always clearly visible and sharp.",
+    `Aspect ratio: ${aspectRatio}.`,
+    `Character identity: ${identityText || "preserve the selected character identity exactly"}.`,
+    `User concept: ${promptBrief}.`,
+    "Lighting and lens: golden hour light, 85mm lens, shallow depth of field, warm cinematic grade, realistic skin texture.",
+    "Continuity: same influencer identity in every shot, same face, same hair, consistent wardrobe, natural speaking expressions.",
+    `Multi-shot breakdown: ${formatShotBreakdown(shots)}.`,
+    `Camera motion per shot: ${formatCameraMotion(shots)}.`,
+    `Dialogue timing: ${formatDialogue(dialogue)}.`,
+    "Audio: clean crisp dialogue, natural location ambience, no music unless the prompt explicitly asks for music.",
+    "Avoid: no wide shots, no extra people, no face blur, no identity drift, no distorted mouth, no distorted hands, no text overlays, no logos, no subtitles."
+  ].join(" ");
+
+  return {
+    duration_seconds: 10,
+    aspect_ratio: aspectRatio,
+    basic_prompt: promptBrief,
+    prompt,
+    shots: normalizeTimedItems(shots, "Shot"),
+    dialogue: normalizeTimedItems(dialogue, "Dialogue"),
+    audio: "clean crisp dialogue, natural location ambience, no music unless requested"
+  };
+}
+
 function buildCharacterDraft(config, prompts) {
   const source = config.character;
   return {
@@ -210,6 +282,26 @@ function formatDialogue(dialogue) {
   return dialogue
     .map((item) => `${item.time} - "${item.line}"`)
     .join("; ");
+}
+
+function buildDialogueFromBrief(brief) {
+  const clean = brief.replace(/\s+/g, " ").trim();
+  const sentences = clean
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.replace(/^["']|["']$/g, "").trim())
+    .filter(Boolean);
+
+  const lines = sentences.length >= 3 ? sentences.slice(0, 3) : [
+    clean,
+    "This moment feels real, personal, and worth remembering.",
+    "And I want you to see it through my eyes."
+  ];
+
+  return [
+    { time: "0-3s", line: lines[0] },
+    { time: "3-7s", line: lines[1] || lines[0] },
+    { time: "7-10s", line: lines[2] || lines[1] || lines[0] }
+  ];
 }
 
 function validateInfluencerVisualConfig(config) {

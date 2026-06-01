@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Influencer Studio</title>
+  <link rel="stylesheet" href="/influencer-styles.css" />
+</head>
+<body>
+  <main class="studio">
+    <header class="studioHeader">
+      <div>
+        <h1>Influencer Studio</h1>
+        <p>Create a character, expand a simple idea into a cinematic prompt, then generate the video.</p>
+      </div>
+      <a class="textLink" href="/">Module 1 UI</a>
+    </header>
+
+    <section class="stepPanel characterStep">
+      <div class="stepHeader">
+        <span class="stepNumber">1</span>
+        <div>
+          <h2>Character</h2>
+          <p>Select an existing influencer or create a new one.</p>
+        </div>
+      </div>
+
+      <div class="segmented" role="tablist" aria-label="Character mode">
+        <button id="selectMode" class="active" type="button">Select</button>
+        <button id="createMode" type="button">Create</button>
+      </div>
+
+      <div id="selectCharacterView" class="stack">
+        <label>
+          Existing character
+          <select id="characterSelect"></select>
+        </label>
+        <dl id="characterDetails" class="details"></dl>
+      </div>
+
+      <form id="createCharacterForm" class="stack hidden">
+        <label>
+          Character name
+          <input id="newCharacterName" autocomplete="off" placeholder="Mumbai Creator" />
+        </label>
+        <label>
+          Voice sample
+          <input id="newVoiceSample" type="file" accept="audio/*" />
+        </label>
+        <label>
+          Reference images
+          <input id="newCharacterImages" type="file" accept="image/*" multiple />
+        </label>
+        <div class="hint">Use a clean base image plus front, 3/4, side profile, close-up, and outfit references when available.</div>
+        <button class="primary" type="submit">Create character</button>
+      </form>
+    </section>
+
+    <section class="stepPanel promptStep">
+      <div class="stepHeader">
+        <span class="stepNumber">2</span>
+        <div>
+          <h2>Prompt Builder</h2>
+          <p>Write a simple idea. The studio turns it into a structured 10-second cinematic prompt.</p>
+        </div>
+      </div>
+
+      <form id="promptForm" class="stack">
+        <label>
+          Aspect ratio
+          <select id="aspectRatio">
+            <option value="9:16" selected>9:16</option>
+            <option value="16:9">16:9</option>
+            <option value="1:1">1:1</option>
+          </select>
+        </label>
+        <label>
+          Basic video idea
+          <textarea id="basicPrompt" rows="8">Mumbai sea-facing intro where the influencer talks about how the city shaped her.</textarea>
+        </label>
+        <div class="actions">
+          <button class="primary" type="submit">Build cinematic prompt</button>
+          <button id="clearButton" type="button">Clear</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="stepPanel reviewStep">
+      <div class="stepHeader">
+        <span class="stepNumber">3</span>
+        <div>
+          <h2>Review</h2>
+          <p>Edit the expanded prompt before video generation.</p>
+        </div>
+      </div>
+
+      <label>
+        Cinematic video prompt
+        <textarea id="expandedPrompt" rows="18" placeholder="Your expanded prompt will appear here."></textarea>
+      </label>
+
+      <div id="shotBreakdown" class="shotBreakdown"></div>
+    </section>
+
+    <section class="stepPanel generateStep">
+      <div class="stepHeader">
+        <span class="stepNumber">4</span>
+        <div>
+          <h2>Generate</h2>
+          <p>Submit the reviewed prompt to the existing Kling video flow.</p>
+        </div>
+      </div>
+
+      <div class="videoPreview">
+        <video id="generatedVideo" controls playsinline></video>
+        <div id="videoPlaceholder" class="videoPlaceholder">Generated video preview</div>
+      </div>
+
+      <div class="actions">
+        <button id="generateVideoButton" class="primary" type="button">Generate video</button>
+        <span id="spinner" class="spinner hidden" aria-hidden="true"></span>
+        <span id="statusText" class="statusText">Ready</span>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/influencer-app.js"></script>
+</body>
+</html>
