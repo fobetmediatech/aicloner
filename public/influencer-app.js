@@ -191,7 +191,7 @@ async function pollTask(taskId) {
     }
 
     if (["failed", "failure", "fail"].includes(status)) {
-      throw new Error("Kling task failed. Check server logs for details.");
+      throw new Error(`Kling task failed: ${summarizeKlingFailure(response)}`);
     }
 
     if (controller.signal.aborted) {
@@ -265,6 +265,16 @@ function setVideo(videoUrl) {
   el.generatedVideo.src = videoUrl;
   el.generatedVideo.load();
   el.videoPlaceholder.classList.add("hidden");
+}
+
+function summarizeKlingFailure(response) {
+  const detail = response?.response?.data?.task_status_msg
+    || response?.response?.data?.task_result?.message
+    || response?.response?.data?.message
+    || response?.response?.message
+    || response?.response?.msg
+    || JSON.stringify(response?.response || response);
+  return String(detail || "No failure detail returned").slice(0, 500);
 }
 
 function cancelPoll() {
