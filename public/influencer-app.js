@@ -65,11 +65,9 @@ async function generateKlingCharacter(event) {
       }
     });
 
-    state.selectedCharacterId = result.character.id;
     await loadCharacters();
     renderGeneratedCharacterImages(result.reference_images || []);
-    setCharacterGenerateStatus(`Character ready: ${result.character.display_name || result.character.id}`);
-    setCharacterMode("select");
+    setCharacterGenerateStatus(`Character ready: ${result.character.display_name || result.character.id}. Select it in Step 1 when ready.`);
   } catch (error) {
     setCharacterGenerateStatus(error.message, true);
   } finally {
