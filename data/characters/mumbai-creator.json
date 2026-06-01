@@ -1,0 +1,26 @@
+{
+  "id": "mumbai-creator",
+  "display_name": "Mumbai Creator",
+  "consent_status": "pending",
+  "source_status": "draft",
+  "kling_element_id": null,
+  "kling_voice_id": null,
+  "reference_images": [
+    "https://raw.githubusercontent.com/fobetmediatech/aicloner/bhavish/public/influencer-assets/mumbai-creator/image_01.jpeg",
+    "https://raw.githubusercontent.com/fobetmediatech/aicloner/bhavish/public/influencer-assets/mumbai-creator/image_02.jpeg",
+    "https://raw.githubusercontent.com/fobetmediatech/aicloner/bhavish/public/influencer-assets/mumbai-creator/image_03.jpeg",
+    "https://raw.githubusercontent.com/fobetmediatech/aicloner/bhavish/public/influencer-assets/mumbai-creator/image_04.jpeg",
+    "https://raw.githubusercontent.com/fobetmediatech/aicloner/bhavish/public/influencer-assets/mumbai-creator/image_05.jpeg",
+    "https://raw.githubusercontent.com/fobetmediatech/aicloner/bhavish/public/influencer-assets/mumbai-creator/image_06.jpeg",
+    "https://raw.githubusercontent.com/fobetmediatech/aicloner/bhavish/public/influencer-assets/mumbai-creator/image_07.jpeg",
+    "https://raw.githubusercontent.com/fobetmediatech/aicloner/bhavish/public/influencer-assets/mumbai-creator/image_08.jpeg",
+    "https://raw.githubusercontent.com/fobetmediatech/aicloner/bhavish/public/influencer-assets/mumbai-creator/image_09.jpeg",
+    "https://raw.githubusercontent.com/fobetmediatech/aicloner/bhavish/public/influencer-assets/mumbai-creator/image_10.jpeg"
+  ],
+  "voice_sample": null,
+  "asset_counts": {
+    "reference_images": 10,
+    "voice_samples": 0
+  },
+  "created_at": "2026-06-01T10:50:47.732Z"
+}
