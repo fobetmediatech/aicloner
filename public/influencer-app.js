@@ -6,6 +6,13 @@ const state = {
 };
 
 const el = {
+  generateCharacterForm: document.querySelector("#generateCharacterForm"),
+  generatedCharacterName: document.querySelector("#generatedCharacterName"),
+  characterPrompt: document.querySelector("#characterPrompt"),
+  characterAspectRatio: document.querySelector("#characterAspectRatio"),
+  characterSpinner: document.querySelector("#characterSpinner"),
+  characterGenerateStatus: document.querySelector("#characterGenerateStatus"),
+  characterImageGrid: document.querySelector("#characterImageGrid"),
   selectMode: document.querySelector("#selectMode"),
   createMode: document.querySelector("#createMode"),
   selectCharacterView: document.querySelector("#selectCharacterView"),
@@ -28,6 +35,7 @@ const el = {
   clearButton: document.querySelector("#clearButton")
 };
 
+el.generateCharacterForm.addEventListener("submit", generateKlingCharacter);
 el.selectMode.addEventListener("click", () => setCharacterMode("select"));
 el.createMode.addEventListener("click", () => setCharacterMode("create"));
 el.characterSelect.addEventListener("change", () => {
@@ -40,6 +48,34 @@ el.generateVideoButton.addEventListener("click", generateVideo);
 el.clearButton.addEventListener("click", clearPrompt);
 
 loadCharacters();
+
+async function generateKlingCharacter(event) {
+  event.preventDefault();
+  setCharacterGenerateBusy(true);
+  setCharacterGenerateStatus("Generating base image in Kling...");
+  el.characterImageGrid.innerHTML = "";
+
+  try {
+    const result = await api("/api/influencer/generate-character", {
+      method: "POST",
+      body: {
+        display_name: el.generatedCharacterName.value.trim(),
+        prompt: el.characterPrompt.value.trim(),
+        aspect_ratio: el.characterAspectRatio.value
+      }
+    });
+
+    state.selectedCharacterId = result.character.id;
+    await loadCharacters();
+    renderGeneratedCharacterImages(result.reference_images || []);
+    setCharacterGenerateStatus(`Character ready: ${result.character.display_name || result.character.id}`);
+    setCharacterMode("select");
+  } catch (error) {
+    setCharacterGenerateStatus(error.message, true);
+  } finally {
+    setCharacterGenerateBusy(false);
+  }
+}
 
 async function loadCharacters() {
   state.characters = await api("/api/characters");
@@ -222,6 +258,20 @@ function renderShotBreakdown(result) {
   `;
 }
 
+function renderGeneratedCharacterImages(urls) {
+  if (!urls.length) {
+    el.characterImageGrid.innerHTML = "";
+    return;
+  }
+
+  el.characterImageGrid.innerHTML = urls.map((url, index) => `
+    <figure>
+      <img src="${escapeHtml(url)}" alt="Generated character reference ${index + 1}" />
+      <figcaption>Reference ${index + 1}</figcaption>
+    </figure>
+  `).join("");
+}
+
 function setCharacterMode(mode) {
   const create = mode === "create";
   el.createCharacterForm.classList.toggle("hidden", !create);
@@ -256,9 +306,19 @@ function setGenerateBusy(isBusy) {
   el.spinner.classList.toggle("hidden", !isBusy);
 }
 
+function setCharacterGenerateBusy(isBusy) {
+  el.generateCharacterForm.querySelectorAll("button, input, textarea, select").forEach((node) => { node.disabled = isBusy; });
+  el.characterSpinner.classList.toggle("hidden", !isBusy);
+}
+
 function setStatus(message, isError = false) {
   el.statusText.textContent = message;
   el.statusText.classList.toggle("error", isError);
+}
+
+function setCharacterGenerateStatus(message, isError = false) {
+  el.characterGenerateStatus.textContent = message;
+  el.characterGenerateStatus.classList.toggle("error", isError);
 }
 
 function setVideo(videoUrl) {

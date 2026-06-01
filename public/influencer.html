@@ -11,10 +11,45 @@
     <header class="studioHeader">
       <div>
         <h1>Influencer Studio</h1>
-        <p>Create a character, expand a simple idea into a cinematic prompt, then generate the video.</p>
+        <p>Generate a Kling character, expand a simple idea into a cinematic prompt, then generate the video.</p>
       </div>
       <a class="textLink" href="/">Module 1 UI</a>
     </header>
+
+    <section class="stepPanel characterGenerateStep">
+      <div class="stepHeader">
+        <span class="stepNumber">0</span>
+        <div>
+          <h2>Generate Character</h2>
+          <p>Create the base influencer image in Kling, then generate multi-shot reference angles.</p>
+        </div>
+      </div>
+
+      <form id="generateCharacterForm" class="stack">
+        <label>
+          Character name
+          <input id="generatedCharacterName" autocomplete="off" placeholder="Mumbai Creator" />
+        </label>
+        <label>
+          Character prompt
+          <textarea id="characterPrompt" rows="8">Modern Indian female AI influencer in Mumbai, premium cinematic look, confident warm smile, emerald green high-neck dress, gold hoop earrings, realistic skin texture, golden hour near Gateway of India.</textarea>
+        </label>
+        <label>
+          Image aspect ratio
+          <select id="characterAspectRatio">
+            <option value="9:16" selected>9:16</option>
+            <option value="1:1">1:1</option>
+            <option value="16:9">16:9</option>
+          </select>
+        </label>
+        <div class="actions">
+          <button class="primary" type="submit">Generate Kling character</button>
+          <span id="characterSpinner" class="spinner hidden" aria-hidden="true"></span>
+          <span id="characterGenerateStatus" class="statusText">Ready</span>
+        </div>
+      </form>
+      <div id="characterImageGrid" class="imageGrid"></div>
+    </section>
 
     <section class="stepPanel characterStep">
       <div class="stepHeader">

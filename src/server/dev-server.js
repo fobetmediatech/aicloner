@@ -54,6 +54,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/config/runtime" && req.method === "GET") {
       return json(res, {
         kling_model: process.env.KLING_MODEL || "kling-video-o1",
+        kling_image_model: process.env.KLING_IMAGE_MODEL || "kling-v2-1",
+        kling_image_create_path: process.env.KLING_IMAGE_CREATE_PATH || "/v1/images/generations",
         kling_base_url: process.env.KLING_API_BASE_URL || "https://api-singapore.klingai.com",
         kling_access_key_configured: Boolean(process.env.KLING_ACCESS_KEY),
         kling_secret_key_configured: Boolean(process.env.KLING_SECRET_KEY),
@@ -89,6 +91,12 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/influencer/expand-prompt" && req.method === "POST") {
       const body = await readJson(req);
       const result = await expandInfluencerPrompt(body);
+      return json(res, result, 201);
+    }
+
+    if (url.pathname === "/api/influencer/generate-character" && req.method === "POST") {
+      const body = await readJson(req);
+      const result = await generateInfluencerCharacter(body);
       return json(res, result, 201);
     }
 
@@ -199,6 +207,120 @@ async function expandInfluencerPrompt(body) {
     brief,
     aspectRatio: body.aspect_ratio || "9:16"
   });
+}
+
+async function generateInfluencerCharacter(body) {
+  const displayName = requiredText(body.display_name, "display_name");
+  const basePrompt = requiredText(body.prompt, "prompt");
+  const characterId = slug(body.id || displayName);
+  const aspectRatio = body.aspect_ratio || "9:16";
+  const negativePrompt = body.negative_prompt || [
+    "distorted face",
+    "extra people",
+    "duplicate person",
+    "bad hands",
+    "text",
+    "watermark",
+    "logo",
+    "cartoon",
+    "low quality"
+  ].join(", ");
+
+  const kling = new KlingClient();
+  const imagePrompt = buildCharacterImagePrompt(basePrompt);
+  const imagePayload = {
+    model_name: process.env.KLING_IMAGE_MODEL || "kling-v2-1",
+    prompt: imagePrompt,
+    negative_prompt: negativePrompt,
+    n: 1,
+    aspect_ratio: aspectRatio
+  };
+
+  const createImageResponse = await kling.createImageGeneration(imagePayload);
+  const imageTaskId = extractTaskId(createImageResponse);
+  if (!imageTaskId) {
+    throw new Error(`Kling image generation did not return task_id: ${JSON.stringify(createImageResponse)}`);
+  }
+
+  const imageResult = await kling.waitForImageTask({
+    taskId: imageTaskId,
+    query: (taskId) => kling.queryImageTask(taskId)
+  });
+  const baseImageUrl = imageResult.image_urls[0];
+
+  const multiShotCreateResponse = await kling.createAiMultiShot({
+    element_frontal_image: baseImageUrl,
+    external_task_id: `influencer-${characterId}-${Date.now()}`,
+    callback_url: ""
+  });
+  const multiShotTaskId = extractTaskId(multiShotCreateResponse);
+  if (!multiShotTaskId) {
+    throw new Error(`Kling AI Multi-Shot did not return task_id: ${JSON.stringify(multiShotCreateResponse)}`);
+  }
+
+  const multiShotResult = await kling.waitForImageTask({
+    taskId: multiShotTaskId,
+    query: (taskId) => kling.queryAiMultiShot(taskId)
+  });
+
+  const referenceImages = [...new Set([baseImageUrl, ...multiShotResult.image_urls])];
+  const character = {
+    id: characterId,
+    display_name: displayName,
+    consent_status: "synthetic-character",
+    source_status: "kling_generated",
+    kling_element_id: null,
+    kling_voice_id: null,
+    reference_images: referenceImages,
+    asset_counts: {
+      reference_images: referenceImages.length,
+      voice_samples: 0
+    },
+    generation: {
+      provider: "kling",
+      base_image_task_id: imageTaskId,
+      ai_multi_shot_task_id: multiShotTaskId,
+      image_model: imagePayload.model_name,
+      aspect_ratio: aspectRatio,
+      prompt: basePrompt,
+      expanded_image_prompt: imagePrompt
+    },
+    created_at: new Date().toISOString()
+  };
+
+  await mkdir(characterDir, { recursive: true });
+  await writeFile(path.join(characterDir, `${character.id}.json`), `${JSON.stringify(character, null, 2)}\n`);
+
+  return {
+    status: "ready",
+    character,
+    base_image_url: baseImageUrl,
+    reference_images: referenceImages,
+    tasks: {
+      base_image: imageTaskId,
+      ai_multi_shot: multiShotTaskId
+    },
+    create_responses: {
+      base_image: createImageResponse,
+      ai_multi_shot: multiShotCreateResponse
+    }
+  };
+}
+
+function buildCharacterImagePrompt(basePrompt) {
+  return [
+    basePrompt,
+    "single synthetic AI influencer character",
+    "front-facing portrait",
+    "face clearly visible and sharp",
+    "centered composition",
+    "realistic human proportions",
+    "premium cinematic social media creator aesthetic",
+    "soft flattering light",
+    "85mm portrait lens",
+    "realistic skin texture",
+    "clean identity reference image for future multi-angle generation"
+  ].join(", ");
 }
 
 async function loadCharacterDraft(characterId) {

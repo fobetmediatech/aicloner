@@ -35,6 +35,55 @@ export class KlingClient {
     });
   }
 
+  async createImageGeneration(payload, path = process.env.KLING_IMAGE_CREATE_PATH || "/v1/images/generations") {
+    this.#requireToken();
+    return this.#request(path, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async queryImageTask(taskId, pathTemplate = process.env.KLING_IMAGE_STATUS_PATH_TEMPLATE || "/v1/images/generations/{task_id}") {
+    this.#requireToken();
+    const path = pathTemplate.replace("{task_id}", encodeURIComponent(taskId));
+    return this.#request(path, { method: "GET" });
+  }
+
+  async createAiMultiShot(payload) {
+    this.#requireToken();
+    return this.#request("/v1/general/ai-multi-shot", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async queryAiMultiShot(taskId) {
+    this.#requireToken();
+    return this.#request(`/v1/general/ai-multi-shot/${encodeURIComponent(taskId)}`, { method: "GET" });
+  }
+
+  async waitForImageTask({
+    taskId,
+    query,
+    pollIntervalMs = Number(process.env.KLING_IMAGE_POLL_MS || 5_000)
+  } = {}) {
+    while (true) {
+      const response = await query(taskId);
+      const status = extractTaskStatus(response);
+      const imageUrls = extractImageUrls(response);
+
+      if (imageUrls.length) {
+        return { response, image_urls: imageUrls, status: status || "succeed" };
+      }
+
+      if (["failed", "failure", "FAILURE", "fail"].includes(status)) {
+        throw new Error(`Kling image task failed: ${summarizeTaskFailure(response)}`);
+      }
+
+      await sleep(pollIntervalMs);
+    }
+  }
+
   async queryTask(taskId) {
     this.#requireToken();
     if (!this.taskStatusPathTemplate) {
@@ -111,6 +160,12 @@ export function extractVideoUrl(response) {
     || null;
 }
 
+export function extractImageUrls(response) {
+  const urls = [];
+  collectImageUrls(response, urls);
+  return [...new Set(urls.filter(Boolean))];
+}
+
 export function extractTaskStatus(response) {
   return response?.task_status
     || response?.status
@@ -121,6 +176,32 @@ export function extractTaskStatus(response) {
     || response?.data?.data?.data?.task_status
     || response?.data?.data?.data?.status
     || null;
+}
+
+function collectImageUrls(value, urls) {
+  if (!value || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    for (const item of value) collectImageUrls(item, urls);
+    return;
+  }
+
+  for (const key of ["url", "image_url", "watermark_url", "url_1", "url_2", "url_3"]) {
+    if (typeof value[key] === "string" && /^https?:\/\//.test(value[key])) {
+      urls.push(value[key]);
+    }
+  }
+
+  for (const item of Object.values(value)) {
+    collectImageUrls(item, urls);
+  }
+}
+
+function summarizeTaskFailure(response) {
+  return response?.data?.task_status_msg
+    || response?.data?.message
+    || response?.message
+    || response?.msg
+    || JSON.stringify(response);
 }
 
 function createKlingJwt({ accessKey, secretKey }) {

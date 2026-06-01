@@ -7,9 +7,9 @@ Module 1 Kling clip generator and from the later voice-cloning integration.
 
 The pipeline creates a repeatable visual kit for one synthetic influencer:
 
-1. Define the influencer persona and visual identity.
-2. Generate a multi-angle reference-shot prompt plan.
-3. Write a character draft into the existing character registry shape.
+1. Generate a base character image through Kling image generation.
+2. Generate multi-angle reference shots through Kling AI Multi-Shot.
+3. Write the generated character into the existing character registry shape.
 4. Use the generated reference images, or a verified Kling element ID, in
    Module 1 for silent visual clip generation.
 
@@ -56,3 +56,23 @@ camera motion, dialogue timing, ambience, and negative instructions.
 The generated `video-prompts.json` includes a flattened prompt string that can
 be pasted directly into Kling or passed into Module 1 after reference images or
 a verified element ID are ready.
+
+## Step 0
+
+The Influencer Studio page adds a Kling-first character generation step:
+
+1. User enters a character name and basic character prompt.
+2. Backend submits a Kling image generation task for the frontal/base image.
+3. Backend submits Kling AI Multi-Shot using that base image.
+4. Returned image URLs are saved to `data/characters/<character_id>.json`.
+5. The UI auto-selects that character for video prompt and video generation.
+
+The AI Multi-Shot endpoint is fixed at `/v1/general/ai-multi-shot`. The
+text-to-image endpoint is configurable because account/model availability may
+vary:
+
+```text
+KLING_IMAGE_MODEL=kling-v2-1
+KLING_IMAGE_CREATE_PATH=/v1/images/generations
+KLING_IMAGE_STATUS_PATH_TEMPLATE=/v1/images/generations/{task_id}
+```
