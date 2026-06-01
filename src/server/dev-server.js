@@ -51,6 +51,16 @@ const server = http.createServer(async (req, res) => {
       return json(res, await listCharacters());
     }
 
+    if (url.pathname === "/api/config/runtime" && req.method === "GET") {
+      return json(res, {
+        kling_model: process.env.KLING_MODEL || "kling-video-o1",
+        kling_base_url: process.env.KLING_API_BASE_URL || "https://api-singapore.klingai.com",
+        kling_access_key_configured: Boolean(process.env.KLING_ACCESS_KEY),
+        kling_secret_key_configured: Boolean(process.env.KLING_SECRET_KEY),
+        kling_api_token_configured: Boolean(process.env.KLING_API_TOKEN)
+      });
+    }
+
     if (url.pathname === "/api/characters" && req.method === "POST") {
       const body = await readJson(req);
       const character = await saveCharacter(body);
