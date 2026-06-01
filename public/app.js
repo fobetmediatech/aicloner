@@ -1,7 +1,9 @@
 const state = {
   characters: [],
   runs: [],
-  selectedCharacterId: null
+  selectedCharacterId: null,
+  activeKlingTaskId: null,
+  klingPollAbort: null
 };
 
 const el = {
@@ -21,6 +23,7 @@ const el = {
   statusPill: document.querySelector("#statusPill"),
   geminiPromptReview: document.querySelector("#geminiPromptReview"),
   generateVideoButton: document.querySelector("#generateVideoButton"),
+  generateVideoSpinner: document.querySelector("#generateVideoSpinner"),
   generateVideoStatus: document.querySelector("#generateVideoStatus"),
   generatedVideo: document.querySelector("#generatedVideo"),
   videoPlaceholder: document.querySelector("#videoPlaceholder")
@@ -108,15 +111,16 @@ async function createCharacter(event) {
   }
 }
 
-
 async function generateVideo() {
   const character = selectedCharacter();
   if (!character) return showError("Create or select a character first.");
   const prompt = el.geminiPromptReview.value.trim();
   if (!prompt) return showError("Generate or enter a Gemini video prompt first.");
 
-  el.generateVideoButton.disabled = true;
-  el.generateVideoStatus.textContent = "Submitting to Kling...";
+  cancelActiveKlingPoll();
+  setGenerateBusy(true);
+  el.generateVideoStatus.textContent = "Submitting to Kling…";
+
   try {
     const result = await api("/api/module1/generate-video", {
       method: "POST",
@@ -126,14 +130,61 @@ async function generateVideo() {
         aspect_ratio: value("#aspectRatio")
       }
     });
-    el.generatedVideo.src = result.video_url;
-    el.generatedVideo.load();
-    el.videoPlaceholder.classList.add("hidden");
-    el.generateVideoStatus.textContent = result.downloaded_path ? `Video ready · saved to ${result.downloaded_path}` : "Video ready";
+
+    if (result.video_url) {
+      setGeneratedVideo(result.video_url);
+      el.generateVideoStatus.textContent = "Video ready";
+      return;
+    }
+
+    if (!result.task_id) {
+      throw new Error("Kling did not return a task_id.");
+    }
+
+    state.activeKlingTaskId = result.task_id;
+    el.generateVideoStatus.textContent = `Waiting for Kling… (task ${result.task_id})`;
+
+    await pollKlingTask(result.task_id);
   } catch (error) {
     el.generateVideoStatus.textContent = error.message;
   } finally {
-    el.generateVideoButton.disabled = false;
+    setGenerateBusy(false);
+  }
+}
+
+async function pollKlingTask(taskId) {
+  const controller = new AbortController();
+  state.klingPollAbort = controller;
+
+  const pollIntervalMs = 5_000;
+
+  while (true) {
+    await sleep(pollIntervalMs);
+
+    const response = await api(`/api/module1/kling-task?task_id=${encodeURIComponent(taskId)}`, {
+      signal: controller.signal
+    });
+
+    const status = String(response.task_status || "").toLowerCase();
+    if (status) {
+      el.generateVideoStatus.textContent = `Kling status: ${status}`;
+    } else {
+      el.generateVideoStatus.textContent = "Kling status: (unknown)";
+    }
+
+    if (response.video_url) {
+      setGeneratedVideo(response.video_url);
+      el.generateVideoStatus.textContent = "Video ready";
+      return;
+    }
+
+    if (["failed", "failure", "fail"].includes(status)) {
+      throw new Error("Kling task failed. Check server logs for details.");
+    }
+
+    if (controller.signal.aborted) {
+      throw new Error("Cancelled.");
+    }
   }
 }
 
@@ -206,7 +257,6 @@ function clipCard(clip, manifest) {
   `;
 }
 
-
 function renderRuns() {
   if (!state.runs.length) {
     el.runList.innerHTML = `<div class="emptyState">No runs yet</div>`;
@@ -240,6 +290,8 @@ function setCharacterMode(mode) {
 }
 
 function clearResult() {
+  cancelActiveKlingPoll();
+
   el.statusPill.textContent = "No run";
   el.statusPill.classList.remove("statusOk", "statusBad");
   el.resultSummary.className = "emptyState";
@@ -247,6 +299,8 @@ function clearResult() {
   el.clipList.innerHTML = "";
   el.geminiPromptReview.value = "";
   el.generateVideoStatus.textContent = "Placeholder until Kling API is connected";
+  el.videoPlaceholder.classList.remove("hidden");
+  el.generatedVideo.removeAttribute("src");
 }
 
 function selectedCharacter() {
@@ -262,6 +316,23 @@ function setCreateBusy(isBusy) {
   el.createCharacterForm.querySelectorAll("button, input").forEach((node) => { node.disabled = isBusy; });
 }
 
+function setGenerateBusy(isBusy) {
+  el.generateVideoButton.disabled = isBusy;
+  el.generateVideoSpinner.classList.toggle("hidden", !isBusy);
+}
+
+function setGeneratedVideo(videoUrl) {
+  el.generatedVideo.src = videoUrl;
+  el.generatedVideo.load();
+  el.videoPlaceholder.classList.add("hidden");
+}
+
+function cancelActiveKlingPoll() {
+  if (state.klingPollAbort) state.klingPollAbort.abort();
+  state.klingPollAbort = null;
+  state.activeKlingTaskId = null;
+}
+
 function showError(message) {
   el.statusPill.textContent = "Not OK";
   el.statusPill.classList.remove("statusOk");
@@ -275,7 +346,8 @@ async function api(url, options = {}) {
   const response = await fetch(url, {
     method: options.method || "GET",
     headers: options.body ? { "Content-Type": "application/json" } : undefined,
-    body: options.body ? JSON.stringify(options.body) : undefined
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    signal: options.signal
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || `Request failed: ${response.status}`);
@@ -309,4 +381,8 @@ function escapeHtml(value) {
     "'": "&#39;",
     '"': "&quot;"
   }[char]));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

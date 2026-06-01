@@ -111,7 +111,7 @@ export function extractVideoUrl(response) {
     || null;
 }
 
-function extractTaskStatus(response) {
+export function extractTaskStatus(response) {
   return response?.task_status
     || response?.status
     || response?.data?.task_status

@@ -8,7 +8,7 @@ import { runModule1 } from "../module1/runner.js";
 import { rewritePromptWithGemini } from "../module1/gemini/rewrite.js";
 import { resolveCharacter } from "../module1/characters/registry.js";
 import { buildOmniVideoPayload } from "../module1/kling/payload.js";
-import { KlingClient, extractTaskId, extractVideoUrl } from "../module1/kling/client.js";
+import { KlingClient, extractTaskId, extractTaskStatus, extractVideoUrl } from "../module1/kling/client.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -19,7 +19,6 @@ const outputDir = path.join(rootDir, "output/module1");
 const uploadDir = path.join(rootDir, "uploads");
 const directorInstructionPath = path.join(rootDir, "config/director-instruction.txt");
 const port = Number(process.env.PORT || 5173);
-
 
 function loadDotEnv(envPath) {
   try {
@@ -70,11 +69,22 @@ const server = http.createServer(async (req, res) => {
       return json(res, { ...result, gemini_rewrite: summarizeGeminiRewrite(rewrite) }, 201);
     }
 
-
     if (url.pathname === "/api/module1/generate-video" && req.method === "POST") {
       const body = await readJson(req);
-      const result = await generateSingleKlingVideo(body);
+      const result = await createSingleKlingVideoTask(body);
       return json(res, result, 201);
+    }
+
+    if (url.pathname === "/api/module1/kling-task" && req.method === "GET") {
+      const taskId = requiredText(url.searchParams.get("task_id"), "task_id");
+      const kling = new KlingClient();
+      const response = await kling.queryTask(taskId);
+      return json(res, {
+        task_id: taskId,
+        task_status: extractTaskStatus(response),
+        video_url: extractVideoUrl(response),
+        response
+      });
     }
 
     if (url.pathname === "/api/runs" && req.method === "GET") {
@@ -103,9 +113,7 @@ server.listen(port, "127.0.0.1", () => {
   console.log(`Module 1 UI: http://127.0.0.1:${port}`);
 });
 
-
-
-async function generateSingleKlingVideo(body) {
+async function createSingleKlingVideoTask(body) {
   const characterId = requiredText(body.character_id, "character_id");
   const prompt = requiredText(body.prompt, "prompt");
   const character = await resolveCharacter({
@@ -124,12 +132,12 @@ async function generateSingleKlingVideo(body) {
   const video = {
     prompt,
     mode: process.env.KLING_TEST_MODE || "std",
-    aspect_ratio: "9:16",
+    aspect_ratio: body.aspect_ratio || "9:16",
     use_element_list: false
   };
 
   const request = buildOmniVideoPayload({
-    modelName: process.env.KLING_MODEL || "omni-v3",
+    modelName: process.env.KLING_MODEL || "kling-video-o1",
     prompt,
     character,
     clip,
@@ -143,11 +151,9 @@ async function generateSingleKlingVideo(body) {
   const taskId = extractTaskId(createResponse);
 
   if (immediateVideoUrl) {
-    const downloaded_path = await downloadKlingVideo({ videoUrl: immediateVideoUrl, taskId });
     return {
       status: "complete",
       video_url: immediateVideoUrl,
-      downloaded_path,
       task_id: taskId,
       request,
       create_response: createResponse
@@ -158,47 +164,12 @@ async function generateSingleKlingVideo(body) {
     throw new Error(`Kling response did not include task_id or video URL: ${JSON.stringify(createResponse)}`);
   }
 
-  const completed = await kling.waitForVideo({
-    taskId,
-    pollIntervalMs: Number(process.env.KLING_TEST_POLL_MS || 5_000)
-  });
-
-  const downloaded_path = await downloadKlingVideo({ videoUrl: completed.video_url, taskId });
-
   return {
-    status: "complete",
-    video_url: completed.video_url,
-    downloaded_path,
+    status: "submitted",
     task_id: taskId,
     request,
-    create_response: createResponse,
-    final_response: completed.response
+    create_response: createResponse
   };
-}
-
-
-async function downloadKlingVideo({ videoUrl, taskId }) {
-  const downloadsDir = path.join(process.env.HOME || rootDir, "Downloads", "kling-test");
-  await mkdir(downloadsDir, { recursive: true });
-  const response = await fetch(videoUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to download Kling video: ${response.status} ${response.statusText}`);
-  }
-  const extension = extensionFromContentType(response.headers.get("content-type")) || ".mp4";
-  const fileName = `${new Date().toISOString().replace(/[:.]/g, "-")}-${taskId || "kling-video"}${extension}`;
-  const filePath = path.join(downloadsDir, fileName);
-  const buffer = Buffer.from(await response.arrayBuffer());
-  await writeFile(filePath, buffer);
-  return filePath;
-}
-
-function extensionFromContentType(contentType = "") {
-  const type = contentType.split(";")[0].trim().toLowerCase();
-  return {
-    "video/mp4": ".mp4",
-    "video/quicktime": ".mov",
-    "application/octet-stream": ".mp4"
-  }[type] || null;
 }
 
 async function loadDirectorInstruction() {
@@ -244,7 +215,6 @@ async function listRuns() {
   return runs;
 }
 
-
 function summarizeGeminiRewrite(rewrite) {
   return {
     provider: rewrite.provider,
@@ -259,14 +229,19 @@ function summarizeGeminiRewrite(rewrite) {
 function buildDryRunConfig(body) {
   const duration = positiveNumber(body.desired_duration_seconds || 10, "desired_duration_seconds");
   const clipLimit = positiveNumber(body.clip_duration_limit_seconds || 10, "clip_duration_limit_seconds");
+
   return {
-    run_name: body.run_name || "ui-module1-dry-run",
-    output_dir: "output/module1",
-    dry_run: true,
-    character_registry_dir: "data/characters",
+    run_id: body.run_id || `run_${new Date().toISOString().replace(/[:.]/g, "-")}`,
+    output_dir: body.output_dir || null,
     character_id: requiredText(body.character_id, "character_id"),
-    storage: {
-      public_base_url: body.public_base_url || "https://example.com/module1-assets"
+    character: body.character || null,
+    desired_duration_seconds: duration,
+    clip_duration_limit_seconds: clipLimit,
+    prompt: requiredText(body.prompt, "prompt"),
+    gemini_rewrite: body.gemini_rewrite || null,
+    planner: {
+      provider: body.planner_provider || "local",
+      model: body.planner_model || "demo"
     },
     video: {
       prompt: requiredText(body.prompt, "prompt"),
@@ -422,59 +397,63 @@ function safeJoin(base, ...parts) {
   return resolved;
 }
 
-function readJson(req) {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk) => {
-      data += chunk;
-      if (data.length > 200_000_000) {
-        reject(new Error("Request body too large"));
-        req.destroy();
-      }
-    });
-    req.on("end", () => {
-      try {
-        resolve(data ? JSON.parse(data) : {});
-      } catch (error) {
-        reject(error);
-      }
-    });
-    req.on("error", reject);
-  });
-}
-
-function json(res, value, status = 200) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
-  res.end(`${JSON.stringify(value, null, 2)}\n`);
-}
-
-function requiredText(value, key) {
-  const text = String(value || "").trim();
-  if (!text) throw new Error(`${key} is required`);
-  return text;
-}
-
-function positiveNumber(value, key) {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number <= 0) throw new Error(`${key} must be positive`);
-  return number;
-}
-
-function emptyToNull(value) {
-  const text = String(value || "").trim();
-  return text ? text : null;
-}
-
-function slug(value) {
-  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
-}
-
 function contentType(ext) {
   return {
     ".html": "text/html; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
-    ".json": "application/json; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
     ".svg": "image/svg+xml"
-  }[ext] || "application/octet-stream";
+  }[ext.toLowerCase()] || "application/octet-stream";
+}
+
+function json(res, data, status = 200) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(`${JSON.stringify(data)}\n`);
+}
+
+async function readJson(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const raw = Buffer.concat(chunks).toString("utf8");
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const error = new Error("Invalid JSON body");
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+function requiredText(value, name) {
+  const text = String(value || "").trim();
+  if (!text) {
+    const error = new Error(`Missing required field: ${name}`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return text;
+}
+
+function positiveNumber(value, name) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) {
+    const error = new Error(`Invalid ${name}`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return number;
+}
+
+function slug(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || `character-${Date.now()}`;
 }
