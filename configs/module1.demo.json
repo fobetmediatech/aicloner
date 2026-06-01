@@ -14,7 +14,7 @@
     "negative_instructions": "avoid extra people, distorted face, distorted hands, text overlays, logos, jump cuts, heavy camera shake"
   },
   "kling": {
-    "model_name": "kling-video-o1",
+    "model_name": "omni-v3",
     "base_url": "https://api-singapore.klingai.com",
     "task_status_path_template": null
   },

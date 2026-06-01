@@ -69,3 +69,41 @@ Schema file: `schema/schema.sql`.
 The current UI still writes demo character metadata to `data/characters/` and
 uploaded files to `uploads/characters/` so development can continue without a
 Kling key or DB driver. The schema is ready for the later persistence adapter.
+
+## Director Instruction
+
+The visible UI only asks for the user prompt. The director skill/instruction is backend-owned.
+
+Default file:
+
+```text
+config/director-instruction.txt
+```
+
+You can override it with:
+
+```bash
+DIRECTOR_INSTRUCTION="..." npm run dev
+```
+
+## Kling Auth
+
+Kling provides two credentials: an Access Key and a Secret Key. The server uses
+them to sign a short-lived HS256 JWT for each run. You normally configure:
+
+```bash
+KLING_ACCESS_KEY=...
+KLING_SECRET_KEY=...
+```
+
+`KLING_API_TOKEN` is optional and only for cases where you manually generate a
+bearer/JWT token yourself.
+
+Smoke-test defaults:
+
+```bash
+KLING_MODEL=kling-video-o1
+KLING_TEST_DURATION_SECONDS=10
+KLING_TEST_MODE=std
+KLING_TEST_POLL_MS=5000
+```

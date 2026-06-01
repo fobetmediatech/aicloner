@@ -97,3 +97,27 @@ as the next request's `first_frame` where the API accepts it.
 That frame must be accessible to Kling as a URL. Local paths are only useful
 inside the manifest. Production needs an object-storage upload step before
 requesting clip 2+.
+
+## Kling v3 / O1 Compatibility Check
+
+Current Module 1 live smoke test uses the official Omni endpoint:
+
+```http
+POST /v1/videos/omni-video
+```
+
+Current request shape is compatible with public Omni examples:
+
+- `model_name`: defaults to `kling-video-o1`
+- `prompt`: editable Gemini output
+- `mode`: defaults to `std` for lowest-cost smoke test
+- `aspect_ratio`: `16:9`, `9:16`, or `1:1` from UI
+- `duration`: defaults to `3` seconds for lowest-cost smoke test
+- `image_list`: first 1-4 character images, or previous end frame for continuation
+- `element_list`: included only if character has `kling_element_id`
+
+Known pre-paid-call constraints:
+
+1. Kling must be able to fetch every image URL. Local `/uploads/...` paths will not work until we add public object storage or use provider-side element IDs.
+2. The default task polling path is `/v1/videos/omni-video/{task_id}`. Verify this with the first create response/account docs if polling fails.
+3. v3 Omni third-party docs show 3-15s duration support, while official O1 examples commonly use `7` and FAQ-like docs mention 3-10s in some workflows. The smoke test uses 3s to stay within both ranges.

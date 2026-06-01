@@ -1,17 +1,47 @@
 #!/usr/bin/env node
 import http from "node:http";
+import { readFileSync } from "node:fs";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runModule1 } from "../module1/runner.js";
+import { rewritePromptWithGemini } from "../module1/gemini/rewrite.js";
+import { resolveCharacter } from "../module1/characters/registry.js";
+import { buildOmniVideoPayload } from "../module1/kling/payload.js";
+import { KlingClient, extractTaskId, extractVideoUrl } from "../module1/kling/client.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
+loadDotEnv(path.join(rootDir, ".env"));
 const publicDir = path.join(rootDir, "public");
 const characterDir = path.join(rootDir, "data/characters");
 const outputDir = path.join(rootDir, "output/module1");
 const uploadDir = path.join(rootDir, "uploads");
+const directorInstructionPath = path.join(rootDir, "config/director-instruction.txt");
 const port = Number(process.env.PORT || 5173);
+
+
+function loadDotEnv(envPath) {
+  try {
+    const raw = readFileSync(envPath, "utf8");
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const equals = trimmed.indexOf("=");
+      if (equals === -1) continue;
+      const key = trimmed.slice(0, equals).trim();
+      let value = trimmed.slice(equals + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      if (key && process.env[key] === undefined) {
+        process.env[key] = value;
+      }
+    }
+  } catch {
+    // .env is optional.
+  }
+}
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -31,8 +61,19 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/api/module1/dry-run" && req.method === "POST") {
       const body = await readJson(req);
-      const config = buildDryRunConfig(body);
+      const rewrite = await rewritePromptWithGemini({
+        instruction: await loadDirectorInstruction(),
+        prompt: body.prompt
+      });
+      const config = buildDryRunConfig({ ...body, prompt: rewrite.output_prompt, gemini_rewrite: rewrite });
       const result = await runModule1(config);
+      return json(res, { ...result, gemini_rewrite: summarizeGeminiRewrite(rewrite) }, 201);
+    }
+
+
+    if (url.pathname === "/api/module1/generate-video" && req.method === "POST") {
+      const body = await readJson(req);
+      const result = await generateSingleKlingVideo(body);
       return json(res, result, 201);
     }
 
@@ -61,6 +102,111 @@ const server = http.createServer(async (req, res) => {
 server.listen(port, "127.0.0.1", () => {
   console.log(`Module 1 UI: http://127.0.0.1:${port}`);
 });
+
+
+
+async function generateSingleKlingVideo(body) {
+  const characterId = requiredText(body.character_id, "character_id");
+  const prompt = requiredText(body.prompt, "prompt");
+  const character = await resolveCharacter({
+    character_id: characterId,
+    character_registry_dir: "data/characters"
+  });
+
+  const clip = {
+    index: 1,
+    id: "clip_001",
+    duration_seconds: Number(process.env.KLING_TEST_DURATION_SECONDS || 10),
+    source_prompt: prompt,
+    continuity_mode: "initial"
+  };
+
+  const video = {
+    prompt,
+    mode: process.env.KLING_TEST_MODE || "std",
+    aspect_ratio: "9:16",
+    use_element_list: false
+  };
+
+  const request = buildOmniVideoPayload({
+    modelName: process.env.KLING_MODEL || "omni-v3",
+    prompt,
+    character,
+    clip,
+    video,
+    previousEndFrameUrl: null
+  });
+
+  const kling = new KlingClient();
+  const createResponse = await kling.createOmniVideo(request);
+  const immediateVideoUrl = extractVideoUrl(createResponse);
+  const taskId = extractTaskId(createResponse);
+
+  if (immediateVideoUrl) {
+    const downloaded_path = await downloadKlingVideo({ videoUrl: immediateVideoUrl, taskId });
+    return {
+      status: "complete",
+      video_url: immediateVideoUrl,
+      downloaded_path,
+      task_id: taskId,
+      request,
+      create_response: createResponse
+    };
+  }
+
+  if (!taskId) {
+    throw new Error(`Kling response did not include task_id or video URL: ${JSON.stringify(createResponse)}`);
+  }
+
+  const completed = await kling.waitForVideo({
+    taskId,
+    pollIntervalMs: Number(process.env.KLING_TEST_POLL_MS || 5_000)
+  });
+
+  const downloaded_path = await downloadKlingVideo({ videoUrl: completed.video_url, taskId });
+
+  return {
+    status: "complete",
+    video_url: completed.video_url,
+    downloaded_path,
+    task_id: taskId,
+    request,
+    create_response: createResponse,
+    final_response: completed.response
+  };
+}
+
+
+async function downloadKlingVideo({ videoUrl, taskId }) {
+  const downloadsDir = path.join(process.env.HOME || rootDir, "Downloads", "kling-test");
+  await mkdir(downloadsDir, { recursive: true });
+  const response = await fetch(videoUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to download Kling video: ${response.status} ${response.statusText}`);
+  }
+  const extension = extensionFromContentType(response.headers.get("content-type")) || ".mp4";
+  const fileName = `${new Date().toISOString().replace(/[:.]/g, "-")}-${taskId || "kling-video"}${extension}`;
+  const filePath = path.join(downloadsDir, fileName);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  await writeFile(filePath, buffer);
+  return filePath;
+}
+
+function extensionFromContentType(contentType = "") {
+  const type = contentType.split(";")[0].trim().toLowerCase();
+  return {
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "application/octet-stream": ".mp4"
+  }[type] || null;
+}
+
+async function loadDirectorInstruction() {
+  if (process.env.DIRECTOR_INSTRUCTION) {
+    return process.env.DIRECTOR_INSTRUCTION;
+  }
+  return readFile(directorInstructionPath, "utf8").catch(() => "");
+}
 
 async function listCharacters() {
   await mkdir(characterDir, { recursive: true });
@@ -98,6 +244,18 @@ async function listRuns() {
   return runs;
 }
 
+
+function summarizeGeminiRewrite(rewrite) {
+  return {
+    provider: rewrite.provider,
+    model: rewrite.model,
+    configured: rewrite.configured,
+    input_prompt: rewrite.input_prompt,
+    output_prompt: rewrite.output_prompt,
+    instruction: rewrite.instruction
+  };
+}
+
 function buildDryRunConfig(body) {
   const duration = positiveNumber(body.desired_duration_seconds || 10, "desired_duration_seconds");
   const clipLimit = positiveNumber(body.clip_duration_limit_seconds || 10, "clip_duration_limit_seconds");
@@ -112,6 +270,9 @@ function buildDryRunConfig(body) {
     },
     video: {
       prompt: requiredText(body.prompt, "prompt"),
+      original_prompt: body.gemini_rewrite?.input_prompt || body.prompt,
+      instruction: body.gemini_rewrite?.instruction || body.instruction || "",
+      gemini_rewrite: body.gemini_rewrite || null,
       desired_duration_seconds: duration,
       clip_duration_limit_seconds: clipLimit,
       aspect_ratio: body.aspect_ratio || "16:9",
@@ -122,7 +283,7 @@ function buildDryRunConfig(body) {
       negative_instructions: body.negative_instructions || ""
     },
     kling: {
-      model_name: body.model_name || "kling-video-o1",
+      model_name: body.model_name || "omni-v3",
       base_url: body.base_url || "https://api-singapore.klingai.com",
       task_status_path_template: null
     }

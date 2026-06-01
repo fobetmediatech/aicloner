@@ -7,14 +7,6 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h1>AI Clone Pipeline</h1>
-      <p>Module 1 · Kling clip planner</p>
-    </div>
-    <button id="refreshButton" class="iconButton" title="Refresh data" aria-label="Refresh data">↻</button>
-  </header>
-
   <main class="workspace">
     <section class="panel characterPanel">
       <div class="panelHeader">
@@ -53,12 +45,12 @@
 
     <section class="panel promptPanel">
       <div class="panelHeader generationHeader">
-        <h2>Generation</h2>
+        <h2>Plan Generation</h2>
         <label class="aspectControl">
           Aspect ratio
           <select id="aspectRatio">
             <option value="16:9">16:9</option>
-            <option value="9:16">9:16</option>
+            <option value="9:16" selected>9:16</option>
             <option value="1:1">1:1</option>
           </select>
         </label>
@@ -86,13 +78,36 @@
       <div id="clipList" class="clipList"></div>
     </section>
 
-    <section class="panel historyPanel">
+    <section class="panel videoGenerationPanel">
       <div class="panelHeader">
-        <h2>Runs</h2>
-        <button id="refreshRuns" class="smallButton" type="button">Refresh</button>
+        <h1>Video Generation</h1>
+        <button id="refreshButton" class="iconButton" title="Refresh data" aria-label="Refresh data">↻</button>
       </div>
-      <div id="runList" class="runList"></div>
+      <div class="generationStage">
+        <div class="videoPreview">
+          <video id="generatedVideo" controls playsinline></video>
+          <div id="videoPlaceholder" class="videoPlaceholder">Generated video preview</div>
+        </div>
+        <div class="promptReview">
+          <label>
+            Gemini video prompt
+            <textarea id="geminiPromptReview" rows="14" placeholder="Generate a plan to review and edit the Gemini prompt here."></textarea>
+          </label>
+          <div class="actions">
+            <button id="generateVideoButton" class="primary" type="button">Generate video</button>
+            <span id="generateVideoStatus" class="muted">Placeholder until Kling API is connected</span>
+          </div>
+        </div>
+      </div>
     </section>
+
+    <details class="panel historyPanel">
+      <summary>
+        <span>Runs</span>
+        <button id="refreshRuns" class="smallButton" type="button">Refresh</button>
+      </summary>
+      <div id="runList" class="runList"></div>
+    </details>
   </main>
 
   <script type="module" src="/app.js"></script>

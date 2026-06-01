@@ -18,7 +18,12 @@ const el = {
   resultSummary: document.querySelector("#resultSummary"),
   clipList: document.querySelector("#clipList"),
   runList: document.querySelector("#runList"),
-  statusPill: document.querySelector("#statusPill")
+  statusPill: document.querySelector("#statusPill"),
+  geminiPromptReview: document.querySelector("#geminiPromptReview"),
+  generateVideoButton: document.querySelector("#generateVideoButton"),
+  generateVideoStatus: document.querySelector("#generateVideoStatus"),
+  generatedVideo: document.querySelector("#generatedVideo"),
+  videoPlaceholder: document.querySelector("#videoPlaceholder")
 };
 
 el.refreshButton.addEventListener("click", refreshAll);
@@ -32,6 +37,7 @@ el.characterSelect.addEventListener("change", () => {
 el.createCharacterForm.addEventListener("submit", createCharacter);
 el.runForm.addEventListener("submit", runDryPlan);
 el.clearResult.addEventListener("click", clearResult);
+el.generateVideoButton.addEventListener("click", generateVideo);
 
 refreshAll();
 
@@ -102,6 +108,35 @@ async function createCharacter(event) {
   }
 }
 
+
+async function generateVideo() {
+  const character = selectedCharacter();
+  if (!character) return showError("Create or select a character first.");
+  const prompt = el.geminiPromptReview.value.trim();
+  if (!prompt) return showError("Generate or enter a Gemini video prompt first.");
+
+  el.generateVideoButton.disabled = true;
+  el.generateVideoStatus.textContent = "Submitting to Kling...";
+  try {
+    const result = await api("/api/module1/generate-video", {
+      method: "POST",
+      body: {
+        character_id: character.id,
+        prompt,
+        aspect_ratio: value("#aspectRatio")
+      }
+    });
+    el.generatedVideo.src = result.video_url;
+    el.generatedVideo.load();
+    el.videoPlaceholder.classList.add("hidden");
+    el.generateVideoStatus.textContent = result.downloaded_path ? `Video ready · saved to ${result.downloaded_path}` : "Video ready";
+  } catch (error) {
+    el.generateVideoStatus.textContent = error.message;
+  } finally {
+    el.generateVideoButton.disabled = false;
+  }
+}
+
 async function runDryPlan(event) {
   event.preventDefault();
   const character = selectedCharacter();
@@ -137,6 +172,7 @@ function renderManifest(manifest) {
   el.statusPill.classList.toggle("statusBad", !ok);
   el.resultSummary.className = "runPath";
   el.resultSummary.textContent = manifest.output_dir;
+  el.geminiPromptReview.value = manifest.gemini_rewrite?.output_prompt || manifest.clips[0]?.source_prompt || "";
   el.clipList.innerHTML = manifest.clips.map((clip) => clipCard(clip, manifest)).join("");
   el.clipList.querySelectorAll(".clipItem").forEach((card) => {
     card.addEventListener("click", () => card.classList.toggle("expanded"));
@@ -159,36 +195,17 @@ function clipCard(clip, manifest) {
           <div class="clipMeta">Click to inspect details</div>
         </div>
       </div>
+      <div class="detailLabel inlineLabel">Gemini output</div>
       <div class="clipPrompt">${escapeHtml(clip.source_prompt || "")}</div>
       <div class="clipDetails">
-        <dl class="details">
-          ${details({
-            Character: manifest.character_id,
-            Duration: `${clip.duration_seconds}s`,
-            Continuity: formatContinuity(clip.continuity_mode),
-            Status: formatStatus(clip.status),
-            Request: clip.request_file,
-            Output: clip.output_video || "pending",
-            "End frame": clip.end_frame || "pending"
-          })}
-        </dl>
-        <div class="detailBlock">
-          <div class="detailLabel">Generated video-model prompt</div>
-          <p>${escapeHtml(clip.prompt)}</p>
+        <div class="detailBlock simplePrompt">
+          <p>${escapeHtml(clip.source_prompt || "")}</p>
         </div>
       </div>
     </article>
   `;
 }
 
-
-function formatStatus(status) {
-  return String(status || "").replace(/^dry_run_/, "").replaceAll("_", " ");
-}
-
-function formatContinuity(value) {
-  return String(value || "").replaceAll("_", " ");
-}
 
 function renderRuns() {
   if (!state.runs.length) {
@@ -226,8 +243,10 @@ function clearResult() {
   el.statusPill.textContent = "No run";
   el.statusPill.classList.remove("statusOk", "statusBad");
   el.resultSummary.className = "emptyState";
-  el.resultSummary.textContent = "Run a dry generation plan to create the Module 1 manifest.";
+  el.resultSummary.textContent = "Generate a clip plan to create the Module 1 manifest.";
   el.clipList.innerHTML = "";
+  el.geminiPromptReview.value = "";
+  el.generateVideoStatus.textContent = "Placeholder until Kling API is connected";
 }
 
 function selectedCharacter() {

@@ -5,8 +5,9 @@
   "kling_element_id": null,
   "kling_voice_id": null,
   "reference_images": [
-    "https://example.com/character/front.jpg",
-    "https://example.com/character/side.jpg",
-    "https://example.com/character/smile.jpg"
-  ]
+    "https://i.ibb.co/rGVPrxkw/PANA7566.jpg",
+    "https://i.ibb.co/VW40fgkR/PANA7575.jpg"
+  ],
+  "source_status": "ready_for_provider",
+  "notes": "Demo reference images are direct i.ibb.co URLs supplied for Kling smoke test."
 }

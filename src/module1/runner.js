@@ -32,6 +32,15 @@ export async function runModule1(config) {
     character_id: character.id,
     desired_duration_seconds: config.video.desired_duration_seconds,
     clip_duration_limit_seconds: config.video.clip_duration_limit_seconds,
+    original_prompt: config.video.original_prompt || config.video.prompt,
+    instruction: config.video.instruction || "",
+    gemini_rewrite: config.video.gemini_rewrite ? {
+      provider: config.video.gemini_rewrite.provider,
+      model: config.video.gemini_rewrite.model,
+      configured: config.video.gemini_rewrite.configured,
+      input_prompt: config.video.gemini_rewrite.input_prompt,
+      output_prompt: config.video.gemini_rewrite.output_prompt
+    } : null,
     output_dir: store.dirs.root,
     clips: []
   };
