@@ -29,6 +29,7 @@ Each run writes:
 
 - `manifest.json`
 - `reference-shot-prompts.json`
+- `video-prompts.json`
 - `character-draft.json`
 
 The default config also writes:
@@ -45,3 +46,13 @@ clean visual planning layer that can feed image generation and then Module 1.
 
 Kling element creation is intentionally not hardcoded yet because the official
 account-specific element-management endpoint still needs to be verified.
+
+## Video Prompt Quality
+
+Video prompts are structured as cinematic shot plans, not loose one-line
+prompts. Each scene can define duration, location, mood, shot timing, framing,
+camera motion, dialogue timing, ambience, and negative instructions.
+
+The generated `video-prompts.json` includes a flattened prompt string that can
+be pasted directly into Kling or passed into Module 1 after reference images or
+a verified element ID are ready.

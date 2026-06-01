@@ -24,5 +24,63 @@
     "lighting": "soft diffused studio lighting",
     "camera": "85mm portrait lens, realistic skin texture",
     "negative_instructions": "avoid extra people, duplicate face, distorted hands, text, watermark, heavy filters, cartoon style"
+  },
+  "video_prompts": {
+    "defaults": {
+      "duration_seconds": 10,
+      "style": "10 second cinematic vertical social video, multiple camera angles, all shots medium to close-up only, no wide shots, face always clearly visible and sharp, golden hour light, 85mm lens, shallow depth of field, warm cinematic grade",
+      "continuity": "same influencer identity in every shot, same face, same hair, consistent wardrobe, natural speaking expressions, premium realistic skin texture",
+      "negative_instructions": "no wide shots, no full-body distance shots, no extra people, no face blur, no identity drift, no distorted mouth, no distorted hands, no text overlays, no logos, no subtitles, no music unless requested"
+    },
+    "scenes": [
+      {
+        "id": "mumbai-sea-facing-intro",
+        "title": "Mumbai Sea-Facing Intro",
+        "location": "Mumbai seaside promenade at golden hour, warm sea breeze, soft waves in the background",
+        "mood": "intimate, cinematic, reflective, premium creator reel",
+        "shots": [
+          {
+            "time": "0-2s",
+            "framing": "Medium shot, waist up, subject begins speaking, face sharp",
+            "camera_motion": "gentle handheld warmth, subtle push-in"
+          },
+          {
+            "time": "2-4s",
+            "framing": "Medium close-up, chest up, direct eye contact with camera",
+            "camera_motion": "locked medium close-up, slight rack focus"
+          },
+          {
+            "time": "4-6s",
+            "framing": "Close-up on face, warm backlight, hair moving naturally in sea breeze",
+            "camera_motion": "locked close-up, face in sharp focus throughout"
+          },
+          {
+            "time": "6-8s",
+            "framing": "Side profile medium close-up, subject gazing toward the sea",
+            "camera_motion": "slow pan following profile, staying tight on face"
+          },
+          {
+            "time": "8-10s",
+            "framing": "Front-facing medium close-up, soft smile, face fully lit",
+            "camera_motion": "static medium close-up, slow subtle zoom in"
+          }
+        ],
+        "dialogue": [
+          {
+            "time": "0-3s",
+            "line": "Mumbai is not just a city, it is a feeling."
+          },
+          {
+            "time": "3-7s",
+            "line": "Chaotic, beautiful, and deeply intimate."
+          },
+          {
+            "time": "7-10s",
+            "line": "This city made me."
+          }
+        ],
+        "audio": "ambient sea waves, soft wind, clear crisp dialogue, no music"
+      }
+    ]
   }
 }
