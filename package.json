@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "influencer:plan": "node src/influencer/cli.js --config configs/influencer.visual.demo.json",
     "module1:dry-run": "node src/module1/cli.js --config configs/module1.demo.json --dry-run",
     "module1:run": "node src/module1/cli.js --config configs/module1.demo.json",
-    "check": "node --check src/module1/cli.js && node --check src/module1/runner.js && node --check src/module1/kling/client.js && node --check src/server/dev-server.js && node --check src/module1/gemini/rewrite.js",
+    "check": "node --check src/influencer/cli.js && node --check src/influencer/visual-pipeline.js && node --check src/module1/cli.js && node --check src/module1/runner.js && node --check src/module1/kling/client.js && node --check src/server/dev-server.js && node --check src/module1/gemini/rewrite.js",
     "dev": "node src/server/dev-server.js",
     "db:up": "docker compose up -d mysql",
     "db:down": "docker compose down",

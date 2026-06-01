@@ -1,0 +1,28 @@
+{
+  "run_name": "demo-ai-influencer-visual-kit",
+  "output_dir": "output/influencer",
+  "character_registry_dir": "data/characters",
+  "character": {
+    "id": "demo-ai-influencer",
+    "display_name": "Demo AI Influencer",
+    "persona": "A confident tech and lifestyle creator with a warm, premium social-media presence.",
+    "visual_identity": {
+      "age_range": "mid 20s",
+      "presentation": "modern Indian female influencer",
+      "face": "oval face, expressive eyes, natural makeup, friendly confident expression",
+      "hair": "long dark hair with soft waves",
+      "wardrobe": "clean streetwear blazer look with subtle premium accessories",
+      "brand_style": "cinematic, polished, realistic, social-first creator aesthetic"
+    },
+    "reference_images": [],
+    "kling_element_id": null,
+    "kling_voice_id": null
+  },
+  "shots": {
+    "aspect_ratio": "9:16",
+    "background": "plain light grey studio background",
+    "lighting": "soft diffused studio lighting",
+    "camera": "85mm portrait lens, realistic skin texture",
+    "negative_instructions": "avoid extra people, duplicate face, distorted hands, text, watermark, heavy filters, cartoon style"
+  }
+}
