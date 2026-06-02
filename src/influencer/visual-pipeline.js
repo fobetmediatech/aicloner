@@ -214,17 +214,19 @@ export function buildInfluencerVideoPrompt({ character, brief, aspectRatio = "9:
 
   const dialogue = buildDialogueFromBrief(promptBrief);
   const prompt = [
-    "10 second cinematic vertical influencer video, multiple camera angles, all shots medium to close-up only, no wide shots, face always clearly visible and sharp.",
-    `Aspect ratio: ${aspectRatio}.`,
-    `Character identity: ${identityText || "preserve the selected character identity exactly"}.`,
-    `User concept: ${promptBrief}.`,
-    "Lighting and lens: golden hour light, 85mm lens, shallow depth of field, warm cinematic grade, realistic skin texture.",
-    "Continuity: same influencer identity in every shot, same face, same hair, consistent wardrobe, natural speaking expressions.",
-    `Multi-shot breakdown: ${formatShotBreakdown(shots)}.`,
-    `Camera motion per shot: ${formatCameraMotion(shots)}.`,
-    `Dialogue timing: ${formatDialogue(dialogue)}.`,
-    "Audio: clean crisp dialogue, natural location ambience, no music unless the prompt explicitly asks for music.",
-    "Avoid: no wide shots, no extra people, no face blur, no identity drift, no distorted mouth, no distorted hands, no text overlays, no logos, no subtitles."
+    "CORE CONCEPT: Create a 10 second cinematic vertical AI influencer video that feels like a premium creator film, not a generic generated clip.",
+    `ASPECT RATIO: ${aspectRatio}.`,
+    `CHARACTER LOCK: ${identityText || "preserve the selected character identity exactly"}. Keep the same face, hair, skin tone, outfit, jewelry, body proportions, and natural expressions across every shot.`,
+    `USER CONCEPT: ${promptBrief}.`,
+    "VISUAL STYLE: Hyper-realistic cinematic social video, 85mm portrait lens feel, shallow depth of field, realistic skin texture, motivated natural light, controlled warm color grade, subtle foreground/background movement, premium editorial composition.",
+    "SHOT RULES: Multiple camera angles, all shots medium to close-up only unless explicitly requested, no unnecessary wide shots, face always clearly visible and sharp, identity never drifts, no jumpy cuts.",
+    `SHOT-BY-SHOT DIRECTION: ${formatShotBreakdown(shots)}.`,
+    `CAMERA LANGUAGE: ${formatCameraMotion(shots)}.`,
+    "PERFORMANCE: The influencer should feel present, intelligent, and emotionally specific. Use natural micro-expressions, realistic eye movement, subtle breathing, small head turns, and believable speaking mouth movement.",
+    `DIALOGUE TIMING: ${formatDialogue(dialogue)}.`,
+    "AUDIO AND AMBIENCE: Clean crisp dialogue, natural location ambience, no music unless the prompt explicitly asks for music.",
+    "CONTINUITY RULES: Keep wardrobe, lighting direction, facial structure, hairstyle, earrings/accessories, and skin texture consistent in every shot. Each shot should feel like it belongs to the same 10-second directed sequence.",
+    "NEGATIVE INSTRUCTIONS: no wide shots unless requested, no extra people, no face blur, no identity drift, no distorted mouth, no distorted hands, no text overlays, no logos, no subtitles, no cartoon style, no plastic skin, no abrupt scene reset."
   ].join(" ");
 
   return {

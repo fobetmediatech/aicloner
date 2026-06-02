@@ -4,24 +4,41 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Influencer Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/influencer-styles.css" />
 </head>
 <body>
   <main class="studio">
     <header class="studioHeader">
-      <div>
+      <div class="headerCopy">
+        <span class="eyebrow">AI Clone Production Suite</span>
         <h1>Influencer Studio</h1>
-        <p>Generate a Kling character, expand a simple idea into a cinematic prompt, then generate the video.</p>
+        <p>Design a photoreal character, direct a cinematic prompt, and launch the video through the Kling pipeline.</p>
       </div>
-      <a class="textLink" href="/">Module 1 UI</a>
+      <div class="heroPreview" aria-hidden="true">
+        <img src="/influencer-assets/mumbai-creator/image_01.jpeg" alt="" />
+        <img src="/influencer-assets/mumbai-creator/image_03.jpeg" alt="" />
+        <img src="/influencer-assets/mumbai-creator/image_08.jpeg" alt="" />
+      </div>
+      <a class="textLink btn-secondary" href="/">Module 1 UI</a>
     </header>
 
-    <section class="stepPanel characterGenerateStep">
+    <nav class="workflowRail" aria-label="Influencer workflow">
+      <button class="workflowTab active" type="button" data-target="#section-character-sheet"><span>0</span>Character Sheet</button>
+      <button class="workflowTab" type="button" data-target="#section-identity-lock"><span>1</span>Identity Lock</button>
+      <button class="workflowTab" type="button" data-target="#section-direction"><span>2</span>Direction</button>
+      <button class="workflowTab" type="button" data-target="#section-prompt-review"><span>3</span>Prompt Review</button>
+      <button class="workflowTab" type="button" data-target="#section-kling-render"><span>4</span>Kling Render</button>
+    </nav>
+
+    <section id="section-character-sheet" class="stepPanel characterGenerateStep reveal">
       <div class="stepHeader">
         <span class="stepNumber">0</span>
         <div>
           <h2>Generate Character</h2>
-          <p>Create the base influencer image in Kling, then generate multi-shot reference angles.</p>
+          <p>Create a Gemini character sheet before moving into Kling video generation.</p>
         </div>
       </div>
 
@@ -32,7 +49,13 @@
         </label>
         <label>
           Character prompt
-          <textarea id="characterPrompt" rows="8">Modern Indian female AI influencer in Mumbai, premium cinematic look, confident warm smile, emerald green high-neck dress, gold hoop earrings, realistic skin texture, golden hour near Gateway of India.</textarea>
+          <textarea id="characterPrompt" rows="8">Create a hyper-realistic photographic character reference sheet for a synthetic Indian female AI influencer in her mid 20s. She must look like a real person photographed in a professional studio, not CGI, not illustration, not a beauty render. She has an elegant oval face, warm brown eyes, natural facial asymmetry, realistic pores, tiny skin texture variations, soft under-eye detail, neatly styled dark hair in a low bun with a side part, subtle premium makeup, confident soft smile, and gold hoop earrings. She wears a ruby red high-neck satin dress with a clean modern silhouette, the character should be curvy and thick and fit.
+
+Show the exact same character in multiple consistent angles on one clean white studio sheet: front-facing portrait, left three-quarter view, right three-quarter view, full side profile, back view, waist-up medium shot, full-body standing shot, close-up face detail, and eye/detail close-up. Keep face, hair, skin tone, outfit, earrings, and body proportions identical across every angle.
+
+Style: full-frame DSLR photography, 85mm portrait lens, realistic depth of field, softbox studio lighting, true-to-life skin tones, photographic skin texture, natural human proportions, sharp facial detail, clean reference-sheet layout, high identity consistency.
+
+Do not add any text, labels, captions, logos, watermarks, social handles, icons, UI elements, borders, or decorative graphics. No extra people. No duplicate identities. No distorted hands. No cartoon style. No anime. No 3D render. No plastic skin. No doll-like face. No airbrushed CGI look. No exaggerated eyes.</textarea>
         </label>
         <label>
           Image aspect ratio
@@ -43,15 +66,30 @@
           </select>
         </label>
         <div class="actions">
-          <button class="primary" type="submit">Generate Kling character</button>
+          <button class="primary btn-primary" type="submit">Generate Gemini character sheet</button>
           <span id="characterSpinner" class="spinner hidden" aria-hidden="true"></span>
           <span id="characterGenerateStatus" class="statusText">Ready</span>
         </div>
       </form>
       <div id="characterImageGrid" class="imageGrid"></div>
+      <div id="publishPanel" class="publishPanel hidden">
+        <div>
+          <strong>Publish before video</strong>
+          <p>Kling can only use public HTTPS image URLs. Publish this sheet, then push the listed files.</p>
+        </div>
+        <button id="publishCharacterButton" class="btn-secondary" type="button">Prepare public URL</button>
+      </div>
     </section>
 
-    <section class="stepPanel characterStep">
+    <div id="imageModal" class="imageModal hidden" role="dialog" aria-modal="true" aria-label="Generated image preview">
+      <div class="imageModalBar">
+        <span id="imageModalTitle">Generated character sheet</span>
+        <button id="imageModalClose" class="btn-secondary" type="button">Close</button>
+      </div>
+      <img id="imageModalImg" alt="Generated character sheet large preview" />
+    </div>
+
+    <section id="section-identity-lock" class="stepPanel characterStep reveal">
       <div class="stepHeader">
         <span class="stepNumber">1</span>
         <div>
@@ -61,8 +99,8 @@
       </div>
 
       <div class="segmented" role="tablist" aria-label="Character mode">
-        <button id="selectMode" class="active" type="button">Select</button>
-        <button id="createMode" type="button">Create</button>
+        <button id="selectMode" class="active btn-secondary" type="button">Select</button>
+        <button id="createMode" class="btn-secondary" type="button">Create</button>
       </div>
 
       <div id="selectCharacterView" class="stack">
@@ -87,11 +125,11 @@
           <input id="newCharacterImages" type="file" accept="image/*" multiple />
         </label>
         <div class="hint">Use a clean base image plus front, 3/4, side profile, close-up, and outfit references when available.</div>
-        <button class="primary" type="submit">Create character</button>
+        <button class="primary btn-primary" type="submit">Create character</button>
       </form>
     </section>
 
-    <section class="stepPanel promptStep">
+    <section id="section-direction" class="stepPanel promptStep reveal">
       <div class="stepHeader">
         <span class="stepNumber">2</span>
         <div>
@@ -114,13 +152,22 @@
           <textarea id="basicPrompt" rows="8">Mumbai sea-facing intro where the influencer talks about how the city shaped her.</textarea>
         </label>
         <div class="actions">
-          <button class="primary" type="submit">Build cinematic prompt</button>
-          <button id="clearButton" type="button">Clear</button>
+          <button id="askQuestionsButton" class="btn-secondary" type="button">Ask direction questions</button>
+          <button class="primary btn-primary" type="submit">Build cinematic prompt</button>
+          <button id="clearButton" class="btn-danger" type="button">Clear</button>
         </div>
       </form>
+      <div id="questionnairePanel" class="questionnairePanel hidden">
+        <div class="miniHeader">Director questions</div>
+        <div id="questionList" class="questionList"></div>
+        <div class="actions">
+          <button id="followupQuestionsButton" class="btn-secondary" type="button">Ask follow-ups</button>
+          <span class="mutedSmall">Answer what matters. More detail gives better camera direction.</span>
+        </div>
+      </div>
     </section>
 
-    <section class="stepPanel reviewStep">
+    <section id="section-prompt-review" class="stepPanel reviewStep reveal">
       <div class="stepHeader">
         <span class="stepNumber">3</span>
         <div>
@@ -137,7 +184,7 @@
       <div id="shotBreakdown" class="shotBreakdown"></div>
     </section>
 
-    <section class="stepPanel generateStep">
+    <section id="section-kling-render" class="stepPanel generateStep reveal">
       <div class="stepHeader">
         <span class="stepNumber">4</span>
         <div>
@@ -152,7 +199,7 @@
       </div>
 
       <div class="actions">
-        <button id="generateVideoButton" class="primary" type="button">Generate video</button>
+        <button id="generateVideoButton" class="primary btn-primary" type="button">Generate video</button>
         <span id="spinner" class="spinner hidden" aria-hidden="true"></span>
         <span id="statusText" class="statusText">Ready</span>
       </div>
