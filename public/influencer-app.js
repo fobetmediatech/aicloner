@@ -5,13 +5,47 @@ const state = {
   pollAbort: null,
   directorQuestions: [],
   activeQuestionIndex: 0,
-  selectedGeneratedSheetUrl: null
+  selectedGeneratedSheetUrl: null,
+  voices: [],
+  voicesStatus: "idle",
+  voiceMode: "existing",
+  selectedVoiceId: null,
+  confirmedVoiceId: null,
+  designedVoicePreviews: [],
+  selectedDesignedVoiceId: null,
+  voiceDesignStatus: "idle",
+  dialogue: "",
+  audioStatus: "idle",
+  audioUrl: null,
+  audioBlob: null,
+  audioDurationSeconds: null,
+  videoUrl: null,
+  videoDurationSeconds: null,
+  attachments: {
+    characterPrompt: [],
+    basicPrompt: [],
+    expandedPrompt: [],
+    voiceDesignPrompt: []
+  }
 };
+
+const defaultVoicePreviewText = "Mumbai is not just a city. It is a feeling, chaotic, beautiful, and deeply intimate. This city made me who I am today.";
 
 const el = {
   generateCharacterForm: document.querySelector("#generateCharacterForm"),
   generatedCharacterName: document.querySelector("#generatedCharacterName"),
+  builderAge: document.querySelector("#builderAge"),
+  builderEthnicity: document.querySelector("#builderEthnicity"),
+  builderGender: document.querySelector("#builderGender"),
+  builderFace: document.querySelector("#builderFace"),
+  builderHair: document.querySelector("#builderHair"),
+  builderBody: document.querySelector("#builderBody"),
+  builderOutfit: document.querySelector("#builderOutfit"),
+  builderAccessories: document.querySelector("#builderAccessories"),
+  buildCharacterPromptButton: document.querySelector("#buildCharacterPromptButton"),
   characterPrompt: document.querySelector("#characterPrompt"),
+  characterPromptAttachments: document.querySelector("#characterPromptAttachments"),
+  characterPromptAttachmentList: document.querySelector("#characterPromptAttachmentList"),
   characterAspectRatio: document.querySelector("#characterAspectRatio"),
   characterSpinner: document.querySelector("#characterSpinner"),
   characterGenerateStatus: document.querySelector("#characterGenerateStatus"),
@@ -37,15 +71,56 @@ const el = {
   questionnairePanel: document.querySelector("#questionnairePanel"),
   questionList: document.querySelector("#questionList"),
   basicPrompt: document.querySelector("#basicPrompt"),
+  basicPromptAttachments: document.querySelector("#basicPromptAttachments"),
+  basicPromptAttachmentList: document.querySelector("#basicPromptAttachmentList"),
   aspectRatio: document.querySelector("#aspectRatio"),
   expandedPrompt: document.querySelector("#expandedPrompt"),
+  expandedPromptAttachments: document.querySelector("#expandedPromptAttachments"),
+  expandedPromptAttachmentList: document.querySelector("#expandedPromptAttachmentList"),
   shotBreakdown: document.querySelector("#shotBreakdown"),
   generateVideoButton: document.querySelector("#generateVideoButton"),
   generatedVideo: document.querySelector("#generatedVideo"),
   videoPlaceholder: document.querySelector("#videoPlaceholder"),
   spinner: document.querySelector("#spinner"),
   statusText: document.querySelector("#statusText"),
-  clearButton: document.querySelector("#clearButton")
+  clearButton: document.querySelector("#clearButton"),
+  voiceExistingMode: document.querySelector("#voiceExistingMode"),
+  voiceDesignMode: document.querySelector("#voiceDesignMode"),
+  existingVoicePanel: document.querySelector("#existingVoicePanel"),
+  loadVoicesButton: document.querySelector("#loadVoicesButton"),
+  voiceStatusText: document.querySelector("#voiceStatusText"),
+  voiceGrid: document.querySelector("#voiceGrid"),
+  voiceConfirmPanel: document.querySelector("#voiceConfirmPanel"),
+  confirmVoiceButton: document.querySelector("#confirmVoiceButton"),
+  selectedVoiceText: document.querySelector("#selectedVoiceText"),
+  voiceDesignForm: document.querySelector("#voiceDesignForm"),
+  voiceDesignPrompt: document.querySelector("#voiceDesignPrompt"),
+  voiceDesignPromptAttachments: document.querySelector("#voiceDesignPromptAttachments"),
+  voiceDesignPromptAttachmentList: document.querySelector("#voiceDesignPromptAttachmentList"),
+  voicePreviewText: document.querySelector("#voicePreviewText"),
+  designedVoiceName: document.querySelector("#designedVoiceName"),
+  designVoiceButton: document.querySelector("#designVoiceButton"),
+  voiceDesignSpinner: document.querySelector("#voiceDesignSpinner"),
+  voiceDesignStatusText: document.querySelector("#voiceDesignStatusText"),
+  voiceDesignGrid: document.querySelector("#voiceDesignGrid"),
+  voiceDesignConfirmPanel: document.querySelector("#voiceDesignConfirmPanel"),
+  saveDesignedVoiceButton: document.querySelector("#saveDesignedVoiceButton"),
+  selectedDesignedVoiceText: document.querySelector("#selectedDesignedVoiceText"),
+  audioForm: document.querySelector("#audioForm"),
+  dialogueInput: document.querySelector("#dialogueInput"),
+  videoDurationText: document.querySelector("#videoDurationText"),
+  generateAudioButton: document.querySelector("#generateAudioButton"),
+  audioSpinner: document.querySelector("#audioSpinner"),
+  audioStatusText: document.querySelector("#audioStatusText"),
+  audioPreviewPanel: document.querySelector("#audioPreviewPanel"),
+  audioPlayer: document.querySelector("#audioPlayer"),
+  durationSyncPanel: document.querySelector("#durationSyncPanel"),
+  syncVideoDurationText: document.querySelector("#syncVideoDurationText"),
+  syncAudioDurationText: document.querySelector("#syncAudioDurationText"),
+  syncDifferenceText: document.querySelector("#syncDifferenceText"),
+  regenerateAudioButton: document.querySelector("#regenerateAudioButton"),
+  confirmAudioButton: document.querySelector("#confirmAudioButton"),
+  audioConfirmText: document.querySelector("#audioConfirmText")
 };
 
 el.generateCharacterForm.addEventListener("submit", generateKlingCharacter);
@@ -63,15 +138,67 @@ el.characterSelect.addEventListener("change", () => {
   state.selectedCharacterId = el.characterSelect.value;
   renderCharacterDetails();
 });
+el.buildCharacterPromptButton.addEventListener("click", buildCharacterPromptFromFields);
+el.characterPromptAttachments.addEventListener("change", () => handleAttachmentInput("characterPrompt", el.characterPromptAttachments, el.characterPromptAttachmentList));
+el.basicPromptAttachments.addEventListener("change", () => handleAttachmentInput("basicPrompt", el.basicPromptAttachments, el.basicPromptAttachmentList));
+el.expandedPromptAttachments.addEventListener("change", () => handleAttachmentInput("expandedPrompt", el.expandedPromptAttachments, el.expandedPromptAttachmentList));
+el.voiceDesignPromptAttachments.addEventListener("change", () => handleAttachmentInput("voiceDesignPrompt", el.voiceDesignPromptAttachments, el.voiceDesignPromptAttachmentList));
 el.createCharacterForm.addEventListener("submit", createCharacter);
 el.askQuestionsButton.addEventListener("click", () => askDirectionQuestions(false));
 el.followupQuestionsButton.addEventListener("click", () => askDirectionQuestions(true));
 el.promptForm.addEventListener("submit", expandPrompt);
 el.generateVideoButton.addEventListener("click", generateVideo);
 el.clearButton.addEventListener("click", clearPrompt);
+el.voiceExistingMode.addEventListener("click", () => setVoiceMode("existing"));
+el.voiceDesignMode.addEventListener("click", () => setVoiceMode("design"));
+el.loadVoicesButton.addEventListener("click", loadElevenLabsVoices);
+el.confirmVoiceButton.addEventListener("click", confirmSelectedVoice);
+el.voiceDesignForm.addEventListener("submit", designVoicePreviews);
+el.saveDesignedVoiceButton.addEventListener("click", saveDesignedVoice);
+el.audioForm.addEventListener("submit", generateAudio);
+el.regenerateAudioButton.addEventListener("click", generateAudio);
+el.confirmAudioButton.addEventListener("click", confirmAudio);
+el.generatedVideo.addEventListener("loadedmetadata", updateVideoDurationFromElement);
+el.audioPlayer.addEventListener("loadedmetadata", updateAudioDurationFromElement);
 
 loadCharacters();
 initUiEnhancements();
+if (el.voicePreviewText && !el.voicePreviewText.value.trim()) {
+  el.voicePreviewText.value = defaultVoicePreviewText;
+}
+
+function buildCharacterPromptFromFields() {
+  const age = fieldValue(el.builderAge, "25");
+  const ethnicity = fieldValue(el.builderEthnicity, "Macedonian");
+  const gender = fieldValue(el.builderGender, "woman");
+  const face = fieldValue(el.builderFace, "elegant oval face, warm brown eyes, and a confident soft smile");
+  const hair = fieldValue(el.builderHair, "dark hair styled in a neat low bun with a visible side part and natural stray flyaways");
+  const body = fieldValue(el.builderBody, "curvy, thick, and fit physique with realistic body proportions");
+  const outfit = fieldValue(el.builderOutfit, "simple black low-neck satin dress showing natural fabric creasing");
+  const accessories = fieldValue(el.builderAccessories, "classic gold hoop earrings");
+  const pronoun = gender === "man" ? "He" : gender === "person" ? "They" : "She";
+  const possessive = gender === "man" ? "His" : gender === "person" ? "Their" : "Her";
+  const noun = `${age}-year-old ${ethnicity} ${gender}`;
+
+  el.characterPrompt.value = `A 3x3 grid layout containing 9 separate, highly consistent, unretouched DSLR photographic panels on a single clean, solid off-white studio sheet. Each panel features the exact same ${noun} with an ${face}. ${possessive} ${hair}. ${pronoun} maintains a ${body} across all views, wearing a ${outfit} and ${accessories}.
+
+The top row (Row 1, Panels 1-3) features strict close-up headshots: 1. Straight-on frontal face detail, 2. Left three-quarter face detail, 3. Full side profile face detail. These close-ups emphasize high-resolution skin texture with visible pores, natural facial asymmetry, subtle moles, fine lines around the eyes, natural under-eye shadows, and slight micro-sweat sheen.
+
+The middle row (Row 2, Panels 4-6) features medium waist-up portraits: 4. Straight-on frontal medium shot, 5. Right three-quarter medium shot, 6. Full side profile medium shot. These panels show the full hairstyle, dress silhouette, and consistent upper-body proportions.
+
+The bottom row (Row 3, Panels 7-9) features full-body and alternative angles:
+7. [CRUCIAL PANEL]: A perfectly symmetrical, straight-on frontal full-body standing shot, arms resting naturally at the sides, head facing directly forward, ensuring identical facial features and body proportions remain perfectly sharp and proportional from head to toe,
+8. Left three-quarter full-body standing shot,
+9. Straight back view showing the full back silhouette, hairstyle, and fit posture.
+
+The lighting throughout all 9 panels is consistent, clean overhead softbox lighting that creates realistic, natural shadows to define facial and body structure without washing out details. Sharp focus across all panels using an 85mm lens at f/4 to prevent distortion and maintain a natural, subtle depth of field. Absolutely no text, no labels, no grid lines, no watermarks, no borders, no CGI elements, no 3D rendering, no airbrushed skin, and no digital smoothing on any panel.`;
+
+  setCharacterGenerateStatus("3x3 character prompt built from fields.");
+}
+
+function fieldValue(input, fallback) {
+  return String(input?.value || fallback).trim() || fallback;
+}
 
 async function generateKlingCharacter(event) {
   event.preventDefault();
@@ -85,7 +212,8 @@ async function generateKlingCharacter(event) {
       body: {
         display_name: el.generatedCharacterName.value.trim(),
         prompt: el.characterPrompt.value.trim(),
-        aspect_ratio: el.characterAspectRatio.value
+        aspect_ratio: el.characterAspectRatio.value,
+        attachments: state.attachments.characterPrompt
       }
     });
 
@@ -202,7 +330,8 @@ async function expandPrompt(event) {
         character_id: character.id,
         prompt: el.basicPrompt.value.trim(),
         aspect_ratio: el.aspectRatio.value,
-        questionnaire_answers: collectQuestionnaireAnswers()
+        questionnaire_answers: collectQuestionnaireAnswers(),
+        attachments: state.attachments.basicPrompt
       }
     });
 
@@ -230,7 +359,8 @@ async function askDirectionQuestions(isFollowup) {
         character_id: character.id,
         prompt: el.basicPrompt.value.trim(),
         aspect_ratio: el.aspectRatio.value,
-        questionnaire_answers: isFollowup ? collectQuestionnaireAnswers() : []
+        questionnaire_answers: isFollowup ? collectQuestionnaireAnswers() : [],
+        attachments: state.attachments.basicPrompt
       }
     });
 
@@ -265,7 +395,7 @@ async function generateVideo() {
       method: "POST",
       body: {
         character_id: character.id,
-        prompt,
+        prompt: mergePromptWithAttachmentContext(prompt, state.attachments.expandedPrompt),
         aspect_ratio: el.aspectRatio.value
       }
     });
@@ -537,6 +667,10 @@ function clearPrompt() {
   state.activeQuestionIndex = 0;
   el.generatedVideo.removeAttribute("src");
   el.videoPlaceholder.classList.remove("hidden");
+  state.videoUrl = null;
+  state.videoDurationSeconds = null;
+  resetAudioState();
+  updateVideoDurationText();
   setStatus("Ready");
 }
 
@@ -557,6 +691,19 @@ function setGenerateBusy(isBusy) {
   el.spinner.classList.toggle("hidden", !isBusy);
 }
 
+function setAudioBusy(isBusy) {
+  el.generateAudioButton.disabled = isBusy;
+  el.regenerateAudioButton.disabled = isBusy;
+  el.confirmAudioButton.disabled = isBusy || state.audioStatus !== "ready";
+  el.audioSpinner.classList.toggle("hidden", !isBusy);
+}
+
+function setVoiceDesignBusy(isBusy) {
+  el.designVoiceButton.disabled = isBusy;
+  el.saveDesignedVoiceButton.disabled = isBusy;
+  el.voiceDesignSpinner.classList.toggle("hidden", !isBusy);
+}
+
 function setCharacterGenerateBusy(isBusy) {
   el.generateCharacterForm.querySelectorAll("button, input, textarea, select").forEach((node) => { node.disabled = isBusy; });
   el.characterSpinner.classList.toggle("hidden", !isBusy);
@@ -567,15 +714,377 @@ function setStatus(message, isError = false) {
   el.statusText.classList.toggle("error", isError);
 }
 
+function setVoiceStatus(message, isError = false) {
+  el.voiceStatusText.textContent = message;
+  el.voiceStatusText.classList.toggle("error", isError);
+}
+
+function setVoiceDesignStatus(message, isError = false) {
+  el.voiceDesignStatusText.textContent = message;
+  el.voiceDesignStatusText.classList.toggle("error", isError);
+}
+
+function setAudioStatus(message, isError = false) {
+  el.audioStatusText.textContent = message;
+  el.audioStatusText.classList.toggle("error", isError);
+}
+
 function setCharacterGenerateStatus(message, isError = false) {
   el.characterGenerateStatus.textContent = message;
   el.characterGenerateStatus.classList.toggle("error", isError);
 }
 
 function setVideo(videoUrl) {
+  state.videoUrl = videoUrl;
   el.generatedVideo.src = videoUrl;
   el.generatedVideo.load();
   el.videoPlaceholder.classList.add("hidden");
+  updateVideoDurationText();
+}
+
+function setVoiceMode(mode) {
+  state.voiceMode = mode === "design" ? "design" : "existing";
+  const isDesign = state.voiceMode === "design";
+  el.existingVoicePanel.classList.toggle("hidden", isDesign);
+  el.voiceDesignForm.classList.toggle("hidden", !isDesign);
+  el.voiceExistingMode.classList.toggle("active", !isDesign);
+  el.voiceDesignMode.classList.toggle("active", isDesign);
+  if (isDesign) hydrateVoiceDesignPrompt();
+  if (!isDesign) ensureVoicesLoaded();
+}
+
+async function hydrateVoiceDesignPrompt() {
+  const character = selectedCharacter();
+  if (!el.designedVoiceName.value.trim() && character) {
+    el.designedVoiceName.value = `${character.display_name || character.id} Voice`;
+  }
+  if (el.voiceDesignPrompt.value.trim()) return;
+
+  if (!character) {
+    setVoiceDesignStatus("Select a character first to generate a matching voice description.", true);
+    return;
+  }
+
+  setVoiceDesignStatus("Asking Gemini for a voice design description...");
+  try {
+    const result = await api("/api/elevenlabs/voice-description", {
+      method: "POST",
+      body: {
+        character_id: character.id,
+        video_prompt: el.expandedPrompt.value.trim(),
+        generated_video_url: state.videoUrl || "",
+        dialogue: el.dialogueInput.value.trim(),
+        attachments: state.attachments.voiceDesignPrompt
+      }
+    });
+    el.voiceDesignPrompt.value = result.voice_description || "";
+    if (result.preview_text && (!el.voicePreviewText.value.trim() || el.voicePreviewText.value.trim() === defaultVoicePreviewText)) {
+      el.voicePreviewText.value = result.preview_text;
+    }
+    setVoiceDesignStatus(`Voice description ready via ${result.provider}`);
+  } catch (error) {
+    setVoiceDesignStatus(error.message, true);
+  }
+}
+
+async function loadElevenLabsVoices() {
+  if (state.voicesStatus === "loading") return;
+  state.voicesStatus = "loading";
+  setVoiceStatus("Loading ElevenLabs voices...");
+  el.loadVoicesButton.disabled = true;
+  try {
+    const result = await api("/api/elevenlabs/voices");
+    state.voices = Array.isArray(result.voices) ? result.voices : [];
+    state.voicesStatus = "ready";
+    renderVoices();
+    setVoiceStatus(state.voices.length ? `${state.voices.length} voices loaded` : "No voices returned");
+  } catch (error) {
+    state.voicesStatus = "error";
+    setVoiceStatus(error.message, true);
+  } finally {
+    el.loadVoicesButton.disabled = false;
+  }
+}
+
+function ensureVoicesLoaded() {
+  if (state.voices.length || state.voicesStatus !== "idle") return;
+  loadElevenLabsVoices();
+}
+
+function renderVoices() {
+  if (!state.voices.length) {
+    el.voiceGrid.innerHTML = "";
+    return;
+  }
+
+  el.voiceGrid.innerHTML = state.voices.map((voice) => {
+    const labels = voice.labels && typeof voice.labels === "object"
+      ? Object.entries(voice.labels).map(([key, value]) => `${key}: ${value}`).join(" · ")
+      : "";
+    const meta = [voice.category, labels].filter(Boolean).join(" · ");
+    return `
+      <article class="voiceCard${voice.voice_id === state.selectedVoiceId ? " selected" : ""}" data-voice-id="${escapeHtml(voice.voice_id)}">
+        <div>
+          <strong>${escapeHtml(voice.name || "Unnamed voice")}</strong>
+          <span>${escapeHtml(meta || "No labels")}</span>
+        </div>
+        <div class="voiceActions">
+          <button class="btn-secondary" type="button" data-select-voice="${escapeHtml(voice.voice_id)}">Select</button>
+          ${voice.preview_url ? `<button class="btn-primary" type="button" data-preview-voice="${escapeHtml(voice.preview_url)}">Listen</button>` : ""}
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  el.voiceGrid.querySelectorAll("[data-select-voice]").forEach((button) => {
+    button.addEventListener("click", () => selectVoice(button.dataset.selectVoice));
+  });
+  el.voiceGrid.querySelectorAll("[data-preview-voice]").forEach((button) => {
+    button.addEventListener("click", () => previewVoice(button.dataset.previewVoice));
+  });
+  applyButtonInteractions(el.voiceGrid.querySelectorAll("button"));
+}
+
+function selectVoice(voiceId) {
+  state.selectedVoiceId = voiceId;
+  state.confirmedVoiceId = null;
+  const voice = selectedVoice();
+  el.voiceConfirmPanel.classList.remove("hidden");
+  el.selectedVoiceText.textContent = voice ? `${voice.name || voice.voice_id} selected` : `${voiceId} selected`;
+  el.audioForm.classList.add("hidden");
+  renderVoices();
+}
+
+function selectedVoice() {
+  return state.voices.find((voice) => voice.voice_id === state.selectedVoiceId) || null;
+}
+
+function previewVoice(previewUrl) {
+  const audio = new Audio(previewUrl);
+  audio.play().catch((error) => setVoiceStatus(`Preview failed: ${error.message}`, true));
+}
+
+function confirmSelectedVoice() {
+  if (!state.selectedVoiceId) return setVoiceStatus("Select a voice first.", true);
+  state.confirmedVoiceId = state.selectedVoiceId;
+  const voice = selectedVoice();
+  el.audioForm.classList.remove("hidden");
+  updateVideoDurationText();
+  setVoiceStatus(`Voice confirmed: ${voice?.name || state.confirmedVoiceId}`);
+}
+
+async function designVoicePreviews(event) {
+  event.preventDefault();
+  const voiceDescription = el.voiceDesignPrompt.value.trim();
+  const previewText = el.voicePreviewText.value.trim();
+  if (!voiceDescription) return setVoiceDesignStatus("Describe the voice first.", true);
+  if (!previewText) return setVoiceDesignStatus("Add preview text first.", true);
+
+  state.voiceDesignStatus = "loading";
+  state.designedVoicePreviews = [];
+  state.selectedDesignedVoiceId = null;
+  el.voiceDesignGrid.innerHTML = "";
+  el.voiceDesignConfirmPanel.classList.add("hidden");
+  setVoiceDesignBusy(true);
+  setVoiceDesignStatus("Designing voice previews...");
+
+  try {
+    const result = await api("/api/elevenlabs/voice-design", {
+      method: "POST",
+      body: {
+        voice_description: voiceDescription,
+        text: previewText
+      }
+    });
+    state.designedVoicePreviews = Array.isArray(result.previews) ? result.previews : [];
+    state.voiceDesignStatus = "ready";
+    renderDesignedVoicePreviews();
+    setVoiceDesignStatus(state.designedVoicePreviews.length ? `${state.designedVoicePreviews.length} voice previews ready` : "No previews returned");
+  } catch (error) {
+    state.voiceDesignStatus = "error";
+    setVoiceDesignStatus(error.message, true);
+  } finally {
+    setVoiceDesignBusy(false);
+  }
+}
+
+function renderDesignedVoicePreviews() {
+  if (!state.designedVoicePreviews.length) {
+    el.voiceDesignGrid.innerHTML = "";
+    return;
+  }
+
+  el.voiceDesignGrid.innerHTML = state.designedVoicePreviews.map((preview, index) => `
+    <article class="voiceCard${preview.generated_voice_id === state.selectedDesignedVoiceId ? " selected" : ""}" data-generated-voice-id="${escapeHtml(preview.generated_voice_id)}">
+      <div>
+        <strong>Designed preview ${index + 1}</strong>
+        <span>${escapeHtml(preview.duration_secs ? `${Number(preview.duration_secs).toFixed(1)}s preview` : "Generated voice preview")}</span>
+      </div>
+      <audio controls src="${escapeHtml(preview.audio_url || "")}"></audio>
+      <div class="voiceActions">
+        <button class="btn-secondary" type="button" data-select-designed-voice="${escapeHtml(preview.generated_voice_id)}">Select</button>
+      </div>
+    </article>
+  `).join("");
+
+  el.voiceDesignGrid.querySelectorAll("[data-select-designed-voice]").forEach((button) => {
+    button.addEventListener("click", () => selectDesignedVoice(button.dataset.selectDesignedVoice));
+  });
+  applyButtonInteractions(el.voiceDesignGrid.querySelectorAll("button"));
+}
+
+function selectDesignedVoice(generatedVoiceId) {
+  state.selectedDesignedVoiceId = generatedVoiceId;
+  el.voiceDesignConfirmPanel.classList.remove("hidden");
+  el.selectedDesignedVoiceText.textContent = "Designed voice preview selected";
+  renderDesignedVoicePreviews();
+}
+
+async function saveDesignedVoice() {
+  if (!state.selectedDesignedVoiceId) return setVoiceDesignStatus("Select a designed voice preview first.", true);
+  const voiceName = el.designedVoiceName.value.trim();
+  if (!voiceName) return setVoiceDesignStatus("Add a saved voice name first.", true);
+
+  setVoiceDesignBusy(true);
+  setVoiceDesignStatus("Saving designed voice to ElevenLabs...");
+  try {
+    const result = await api("/api/elevenlabs/voice-design/save", {
+      method: "POST",
+      body: {
+        generated_voice_id: state.selectedDesignedVoiceId,
+        voice_name: voiceName,
+        voice_description: el.voiceDesignPrompt.value.trim()
+      }
+    });
+    state.selectedVoiceId = result.voice_id;
+    state.confirmedVoiceId = result.voice_id;
+    el.audioForm.classList.remove("hidden");
+    updateVideoDurationText();
+    setVoiceDesignStatus(`Voice saved and confirmed: ${result.name || result.voice_id}`);
+  } catch (error) {
+    setVoiceDesignStatus(error.message, true);
+  } finally {
+    setVoiceDesignBusy(false);
+  }
+}
+
+async function generateAudio(event) {
+  event?.preventDefault();
+  if (!state.confirmedVoiceId) return setAudioStatus("Confirm a voice first.", true);
+  const dialogue = el.dialogueInput.value.trim();
+  if (!dialogue) return setAudioStatus("Enter the exact dialogue first.", true);
+
+  state.dialogue = dialogue;
+  state.audioStatus = "loading";
+  setAudioStatus("Generating ElevenLabs audio...");
+  setAudioBusy(true);
+  el.audioPreviewPanel.classList.add("hidden");
+
+  try {
+    const response = await fetch(`/api/elevenlabs/text-to-speech/${encodeURIComponent(state.confirmedVoiceId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: dialogue })
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => null);
+      throw new Error(errorBody?.error || `Audio generation failed: ${response.status}`);
+    }
+
+    if (state.audioUrl) URL.revokeObjectURL(state.audioUrl);
+    state.audioBlob = await response.blob();
+    state.audioUrl = URL.createObjectURL(state.audioBlob);
+    state.audioStatus = "ready";
+    state.audioDurationSeconds = null;
+    el.audioPlayer.src = state.audioUrl;
+    el.audioPreviewPanel.classList.remove("hidden");
+    updateDurationSyncPanel();
+    setAudioStatus("Audio ready");
+    setAudioBusy(false);
+  } catch (error) {
+    state.audioStatus = "error";
+    setAudioStatus(error.message, true);
+    setAudioBusy(false);
+  }
+}
+
+function confirmAudio() {
+  if (!state.audioUrl || !state.audioBlob) return setAudioStatus("Generate audio first.", true);
+  const sync = durationSyncStatus();
+  if (!sync.ready) return setAudioStatus("Load both video and audio durations before confirming.", true);
+  if (!sync.matches) {
+    return setAudioStatus(`Audio/video length mismatch: ${sync.difference.toFixed(2)}s difference. Regenerate or edit dialogue before Sync 3.0.`, true);
+  }
+  state.audioStatus = "ready";
+  el.audioConfirmText.textContent = `Confirmed. videoUrl and audioUrl are duration-matched for Sync 3.0.`;
+  setAudioStatus("Audio confirmed");
+}
+
+function resetAudioState() {
+  if (state.audioUrl) URL.revokeObjectURL(state.audioUrl);
+  state.dialogue = "";
+  state.audioStatus = "idle";
+  state.audioUrl = null;
+  state.audioBlob = null;
+  state.audioDurationSeconds = null;
+  el.dialogueInput.value = "";
+  el.audioPlayer.removeAttribute("src");
+  el.audioPreviewPanel.classList.add("hidden");
+  updateDurationSyncPanel();
+  setAudioStatus("Ready");
+}
+
+function updateVideoDurationFromElement() {
+  state.videoDurationSeconds = Number.isFinite(el.generatedVideo.duration) ? el.generatedVideo.duration : null;
+  updateVideoDurationText();
+  updateDurationSyncPanel();
+}
+
+function updateAudioDurationFromElement() {
+  state.audioDurationSeconds = Number.isFinite(el.audioPlayer.duration) ? el.audioPlayer.duration : null;
+  updateDurationSyncPanel();
+}
+
+function updateVideoDurationText() {
+  if (state.videoDurationSeconds) {
+    el.videoDurationText.textContent = `${state.videoDurationSeconds.toFixed(1)} seconds`;
+    return;
+  }
+  el.videoDurationText.textContent = state.videoUrl ? "Video loaded, reading duration..." : "No video loaded yet";
+}
+
+function durationSyncStatus() {
+  const video = state.videoDurationSeconds;
+  const audio = state.audioDurationSeconds;
+  if (!video || !audio) {
+    return { ready: false, matches: false, difference: 0 };
+  }
+  const difference = Math.abs(video - audio);
+  const tolerance = Math.max(0.35, video * 0.06);
+  return {
+    ready: true,
+    matches: difference <= tolerance,
+    difference,
+    tolerance
+  };
+}
+
+function updateDurationSyncPanel() {
+  if (!el.durationSyncPanel) return;
+  const sync = durationSyncStatus();
+  el.syncVideoDurationText.textContent = state.videoDurationSeconds ? `${state.videoDurationSeconds.toFixed(2)}s` : "--";
+  el.syncAudioDurationText.textContent = state.audioDurationSeconds ? `${state.audioDurationSeconds.toFixed(2)}s` : "--";
+  el.syncDifferenceText.textContent = sync.ready ? `${sync.difference.toFixed(2)}s` : "--";
+  el.durationSyncPanel.classList.toggle("matched", sync.ready && sync.matches);
+  el.durationSyncPanel.classList.toggle("mismatch", sync.ready && !sync.matches);
+  if (sync.ready && sync.matches) {
+    el.audioConfirmText.textContent = `Length match is within ${sync.tolerance.toFixed(2)}s. Ready for Sync 3.0.`;
+  } else if (sync.ready) {
+    el.audioConfirmText.textContent = `Length mismatch is ${sync.difference.toFixed(2)}s. Adjust dialogue or regenerate audio before Sync 3.0.`;
+  } else {
+    el.audioConfirmText.textContent = "Audio and video durations will be checked before Sync 3.0.";
+  }
 }
 
 function summarizeKlingFailure(response) {
@@ -613,6 +1122,83 @@ function fileToData(file) {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+async function handleAttachmentInput(key, input, listEl) {
+  const files = Array.from(input.files || []);
+  state.attachments[key] = await Promise.all(files.map(fileToPromptAttachment));
+  renderAttachmentList(key, listEl);
+}
+
+function fileToPromptAttachment(file) {
+  const maxInlineBytes = 8 * 1024 * 1024;
+  const base = {
+    name: file.name,
+    type: file.type || "application/octet-stream",
+    size: file.size,
+    kind: file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : "file"
+  };
+
+  if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+    return Promise.resolve(base);
+  }
+
+  if (file.size > maxInlineBytes) {
+    return Promise.resolve({
+      ...base,
+      skipped_data: true,
+      note: "File is larger than 8 MB, so only metadata is sent as prompt context."
+    });
+  }
+
+  return fileToData(file).then((data) => ({
+    ...base,
+    data_url: data.data_url
+  }));
+}
+
+function renderAttachmentList(key, listEl) {
+  const attachments = state.attachments[key] || [];
+  if (!attachments.length) {
+    listEl.innerHTML = "";
+    return;
+  }
+
+  listEl.innerHTML = attachments.map((attachment, index) => `
+    <article class="attachmentChip">
+      ${attachment.data_url && attachment.kind === "image" ? `<img src="${escapeHtml(attachment.data_url)}" alt="" />` : `<span class="attachmentIcon">${attachment.kind === "video" ? "VID" : "IMG"}</span>`}
+      <div>
+        <strong>${escapeHtml(attachment.name)}</strong>
+        <small>${escapeHtml(formatAttachmentMeta(attachment))}</small>
+      </div>
+      <button class="btn-secondary" type="button" data-remove-attachment="${index}">Remove</button>
+    </article>
+  `).join("");
+
+  listEl.querySelectorAll("[data-remove-attachment]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.attachments[key].splice(Number(button.dataset.removeAttachment), 1);
+      renderAttachmentList(key, listEl);
+    });
+  });
+  applyButtonInteractions(listEl.querySelectorAll("button"));
+}
+
+function formatAttachmentMeta(attachment) {
+  const kb = Math.max(1, Math.round(Number(attachment.size || 0) / 1024));
+  return `${attachment.type || "file"} · ${kb} KB${attachment.skipped_data ? " · metadata only" : ""}`;
+}
+
+function mergePromptWithAttachmentContext(prompt, attachments) {
+  const summary = attachmentContextText(attachments);
+  return summary ? `${prompt}\n\nATTACHED REFERENCE CONTEXT:\n${summary}` : prompt;
+}
+
+function attachmentContextText(attachments) {
+  const items = (attachments || []).map((attachment, index) => (
+    `${index + 1}. ${attachment.kind || "file"} reference "${attachment.name}" (${attachment.type || "unknown type"}, ${Math.round(Number(attachment.size || 0) / 1024)} KB).`
+  ));
+  return items.join("\n");
 }
 
 function details(values) {
@@ -682,6 +1268,7 @@ function initWorkflowTabs() {
     tab.addEventListener("click", () => {
       const target = document.querySelector(tab.dataset.target);
       if (!target) return;
+      if (target.id === "section-audio-generation") ensureVoicesLoaded();
       const offset = 60;
       const top = target.getBoundingClientRect().top + window.scrollY - offset;
       window.scrollTo({ top, behavior: "smooth" });
@@ -695,6 +1282,7 @@ function initWorkflowTabs() {
         document.querySelectorAll("[data-target]").forEach((tab) => tab.classList.remove("active"));
         const activeTab = document.querySelector(`[data-target="#${id}"]`);
         if (activeTab) activeTab.classList.add("active");
+        if (id === "section-audio-generation") ensureVoicesLoaded();
       }
     });
   }, { threshold: 0.3 });

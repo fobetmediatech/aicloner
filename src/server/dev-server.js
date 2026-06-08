@@ -61,7 +61,8 @@ const server = http.createServer(async (req, res) => {
         kling_secret_key_configured: Boolean(process.env.KLING_SECRET_KEY),
         kling_api_token_configured: Boolean(process.env.KLING_API_TOKEN),
         gemini_image_model: process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image",
-        gemini_api_key_configured: Boolean(process.env.GEMINI_API_KEY)
+        gemini_api_key_configured: Boolean(process.env.GEMINI_API_KEY),
+        elevenlabs_api_key_configured: Boolean(process.env.ELEVENLABS_API_KEY)
       });
     }
 
@@ -120,6 +121,49 @@ const server = http.createServer(async (req, res) => {
       return json(res, result, 201);
     }
 
+    if (url.pathname === "/api/elevenlabs/voices" && req.method === "GET") {
+      const result = await fetchElevenLabsVoices();
+      return json(res, result);
+    }
+
+    if (url.pathname === "/api/elevenlabs/voice-description" && req.method === "POST") {
+      const body = await readJson(req);
+      const result = await buildGeminiVoiceDescription(body);
+      return json(res, result, 201);
+    }
+
+    if (url.pathname === "/api/elevenlabs/voice-design" && req.method === "POST") {
+      const body = await readJson(req);
+      const result = await designElevenLabsVoice({
+        voiceDescription: requiredText(body.voice_description, "voice_description"),
+        text: requiredText(body.text, "text")
+      });
+      return json(res, result, 201);
+    }
+
+    if (url.pathname === "/api/elevenlabs/voice-design/save" && req.method === "POST") {
+      const body = await readJson(req);
+      const result = await saveElevenLabsDesignedVoice({
+        generatedVoiceId: requiredText(body.generated_voice_id, "generated_voice_id"),
+        voiceName: requiredText(body.voice_name, "voice_name"),
+        voiceDescription: requiredText(body.voice_description, "voice_description")
+      });
+      return json(res, result, 201);
+    }
+
+    const ttsMatch = url.pathname.match(/^\/api\/elevenlabs\/text-to-speech\/([^/]+)$/);
+    if (ttsMatch && req.method === "POST") {
+      const body = await readJson(req);
+      const voiceId = decodeURIComponent(ttsMatch[1]);
+      const audio = await generateElevenLabsSpeech({ voiceId, text: requiredText(body.text, "text") });
+      res.writeHead(200, {
+        "Content-Type": "audio/mpeg",
+        "Content-Length": audio.byteLength
+      });
+      res.end(audio);
+      return;
+    }
+
     if (url.pathname === "/api/module1/kling-task" && req.method === "GET") {
       const taskId = requiredText(url.searchParams.get("task_id"), "task_id");
       const kling = new KlingClient();
@@ -160,7 +204,8 @@ server.listen(port, "127.0.0.1", () => {
 
 async function createSingleKlingVideoTask(body) {
   const characterId = requiredText(body.character_id, "character_id");
-  const prompt = requiredText(body.prompt, "prompt");
+  const originalPrompt = requiredText(body.prompt, "prompt");
+  const prompt = toKlingSafePrompt(originalPrompt);
   const character = await resolveCharacter({
     character_id: characterId,
     character_registry_dir: "data/characters"
@@ -212,9 +257,60 @@ async function createSingleKlingVideoTask(body) {
   return {
     status: "submitted",
     task_id: taskId,
+    prompt_was_compacted: prompt !== originalPrompt,
+    original_prompt_length: originalPrompt.length,
+    submitted_prompt_length: prompt.length,
     request,
     create_response: createResponse
   };
+}
+
+function toKlingSafePrompt(prompt, maxLength = 2400) {
+  const normalized = String(prompt || "")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (normalized.length <= maxLength) return normalized;
+
+  const sentences = normalized
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const priorityPatterns = [
+    /10-second|cinematic|core concept|character lock|same character|identity|face/i,
+    /0-2s|2-4s|4-6s|6-8s|8-10s|shot|camera|lens|framing|close-up|medium/i,
+    /dialogue|audio|voice|speak|ambient|sound/i,
+    /lighting|color|golden|softbox|depth of field|focus/i,
+    /negative|avoid|no text|no logo|no watermark|distorted|blur/i
+  ];
+
+  const selected = [];
+  const seen = new Set();
+  for (const pattern of priorityPatterns) {
+    for (const sentence of sentences) {
+      const key = sentence.toLowerCase();
+      if (!seen.has(key) && pattern.test(sentence)) {
+        selected.push(sentence);
+        seen.add(key);
+      }
+    }
+  }
+
+  for (const sentence of sentences) {
+    if (selected.join(" ").length >= maxLength - 260) break;
+    const key = sentence.toLowerCase();
+    if (!seen.has(key)) {
+      selected.push(sentence);
+      seen.add(key);
+    }
+  }
+
+  const compacted = selected.join(" ").replace(/\s+/g, " ").trim();
+  if (compacted.length <= maxLength) return compacted;
+  return `${compacted.slice(0, maxLength - 1).trim()}.`;
 }
 
 async function publishCharacterSheet(body) {
@@ -320,7 +416,8 @@ async function selectCharacterSheet(body) {
 
 async function expandInfluencerPrompt(body) {
   const characterId = requiredText(body.character_id, "character_id");
-  const brief = requiredText(body.prompt, "prompt");
+  const attachments = normalizePromptAttachments(body.attachments);
+  const brief = requiredText(mergeTextWithPromptAttachments(body.prompt, attachments), "prompt");
   const character = await loadCharacterDraft(characterId);
 
   if (Array.isArray(body.questionnaire_answers) && body.questionnaire_answers.length) {
@@ -341,17 +438,19 @@ async function expandInfluencerPrompt(body) {
 
 async function buildInfluencerPromptQuestions(body) {
   const characterId = requiredText(body.character_id, "character_id");
-  const brief = requiredText(body.prompt, "prompt");
+  const attachments = normalizePromptAttachments(body.attachments);
+  const brief = requiredText(mergeTextWithPromptAttachments(body.prompt, attachments), "prompt");
   const character = await loadCharacterDraft(characterId);
   const existingAnswers = Array.isArray(body.questionnaire_answers) ? body.questionnaire_answers : [];
 
   const instruction = [
-    "You are a senior cinematic director and prompt engineer for AI influencer videos.",
-    "Ask only questions that materially improve a 10-second directed video prompt.",
-    "Focus on visual storytelling, emotional tone, camera language, location, action, dialogue, pacing, lighting, wardrobe continuity, and avoidances.",
+    "You are a talking head video production director in PHASE 1 CLARIFICATION.",
+    "Ask only 1-2 focused questions per response.",
+    "Only ask about missing context needed for a waist-up single-presenter talking head video.",
+    "Stop asking and return an empty questions array when these are all clear: presenter identity and description, script or topic/key points, tone/energy, use case, and target video length.",
     existingAnswers.length
-      ? "The user has already answered some questions. Ask only the missing follow-up questions still needed for clear direction. If everything is clear, return an empty questions array."
-      : "Ask around 10 concise questions. Do not exceed 10.",
+      ? "The user has already answered some questions. Ask only the next missing 1-2 questions."
+      : "Ask the first 1-2 highest-priority missing questions.",
     "Return strict JSON only, with this shape: {\"questions\":[{\"id\":\"q1\",\"question\":\"...\",\"hint\":\"...\"}]}"
   ].join(" ");
 
@@ -360,7 +459,8 @@ async function buildInfluencerPromptQuestions(body) {
     prompt: JSON.stringify({
       character: summarizeCharacterForPrompt(character),
       basic_video_idea: brief,
-      existing_answers: existingAnswers
+      existing_answers: existingAnswers,
+      attached_references: summarizePromptAttachments(attachments)
     }, null, 2),
     temperature: 0.55
   });
@@ -370,7 +470,7 @@ async function buildInfluencerPromptQuestions(body) {
   return {
     provider: "gemini",
     model: process.env.GEMINI_MODEL || "gemini-3-flash-preview",
-    questions: questions.slice(0, existingAnswers.length ? 5 : 10).map((item, index) => ({
+    questions: questions.slice(0, 2).map((item, index) => ({
       id: slug(item.id || `q${index + 1}`),
       question: String(item.question || "").trim(),
       hint: String(item.hint || "").trim()
@@ -380,19 +480,18 @@ async function buildInfluencerPromptQuestions(body) {
 
 async function buildGeminiDirectedVideoPrompt({ character, brief, aspectRatio, questionnaireAnswers }) {
   const instruction = [
-    "You are a senior cinematic director and prompt engineer.",
-    "Write a highly detailed, production-ready prompt for a 10-second AI influencer video.",
-    "The prompt must be dense, cinematic, and specific. It should read like a director's shot plan for a premium commercial or creator film, not like a short generic prompt.",
+    "You are a talking head video production director in PHASE 2 PROMPT GENERATION.",
+    "Use every user input: selected character, basic prompt, attached reference context, and all questionnaire answers from the previous step.",
+    "Generate a prompt for a waist-up, single-presenter talking head video.",
     "The output must be strict JSON only.",
-    "Use this shape: {\"prompt\":\"...\",\"shots\":[{\"time\":\"0-2s\",\"framing\":\"...\",\"camera_motion\":\"...\"}],\"dialogue\":[{\"time\":\"0-3s\",\"line\":\"...\"}],\"audio\":\"...\"}.",
-    "The prompt field must be 450-800 words.",
-    "The prompt field must include these sections as plain text inside the prompt: CORE CONCEPT, CHARACTER LOCK, VISUAL STYLE, SHOT-BY-SHOT DIRECTION, CAMERA LANGUAGE, PERFORMANCE, LIGHTING AND COLOR, ENVIRONMENT, AUDIO AND DIALOGUE, CONTINUITY RULES, NEGATIVE INSTRUCTIONS.",
-    "Use 5 shots for a 10-second video: 0-2s, 2-4s, 4-6s, 6-8s, 8-10s.",
-    "Every shot must specify framing, subject action, facial visibility, lens feel, camera motion, focus behavior, and transition logic.",
-    "Prefer medium, medium close-up, close-up, and tight profile shots unless the user explicitly requested wide shots.",
-    "The face must remain sharp, identity-consistent, and visible in every shot.",
-    "Include cinematic details: 85mm lens, shallow depth of field, motivated light, foreground/background movement, natural micro-expressions, wardrobe continuity, realistic skin texture, and controlled camera motion.",
-    "The result should feel cinematic, directed, premium, and visually specific."
+    "Use this JSON shape: {\"prompt\":\"...\",\"script\":\"...\",\"dialogue\":[{\"time\":\"...\",\"line\":\"...\"}],\"audio\":\"...\"}.",
+    "The prompt field must contain exactly two plain-text sections and nothing else: [VIDEO GENERATION PROMPT] and [SCRIPT].",
+    "The [VIDEO GENERATION PROMPT] section must follow this structure: A waist-up, single-presenter talking head video shot on a 35mm lens. Raw unedited footage, natural studio lighting, photorealistic. The presenter is <describe the uploaded/mentioned character - ethnicity, hair color and style, specific features>, wearing <clothing appropriate to use case and tone>. She/He looks directly into the camera, blinking naturally. The background is a static, softly blurred minimalist studio with a neutral plaster wall. The presenter maintains a consistent appearance throughout. Mouth movements precisely match the character's native audio. Hand and arm gestures are subtle, grounded, and timed to the speech rhythm - occasionally bringing one hand toward the chest or using open-palm gestures to emphasize a point, never wide or theatrical. No VFX, no transitions, no 3D renders, no motion graphics, no color grading, no stylization. Model: Kling Omni v3",
+    "The [SCRIPT] section must use the user's exact script if provided, rewritten for spoken delivery with short sentences, natural phrasing, no filler words, and pauses marked with ... where needed.",
+    "If the user only gave a topic, write a full spoken-word script. Approximate word count by target length: 130 words for 60s, 200 words for 90s, 280 words for 2min. If target length is unclear, make it concise for about 60s.",
+    "Never use these words anywhere in the prompt or script: breathtaking, stunning, captivating, mesmerizing, hyperrealistic, seamlessly, flawlessly, perfect, amazing, incredible, professional-grade, next-level, cutting-edge, state-of-the-art, elevate, unlock, powerful, dynamic, vibrant, engaging.",
+    "Always enforce: no VFX, no transitions, no 3D, no motion graphics, no stylized color grading, single consistent character, no morphing, no cuts, no multiple angles unless asked.",
+    "The sentence 'Mouth movements precisely match the character's native audio' must appear verbatim in the video prompt."
   ].join(" ");
 
   const text = await callGeminiText({
@@ -412,15 +511,17 @@ async function buildGeminiDirectedVideoPrompt({ character, brief, aspectRatio, q
   }
 
   const prompt = String(parsed.prompt).trim();
+  const script = String(parsed.script || extractScriptFromPrompt(prompt)).trim();
 
   return {
     duration_seconds: 10,
     aspect_ratio: aspectRatio,
     basic_prompt: brief,
     prompt,
-    shots: Array.isArray(parsed.shots) ? parsed.shots : [],
+    shots: [],
     dialogue: Array.isArray(parsed.dialogue) ? parsed.dialogue : [],
-    audio: parsed.audio || "clean crisp dialogue, natural location ambience, no music unless requested",
+    audio: parsed.audio || "clean native dialogue, natural room tone, no music unless requested",
+    script,
     questionnaire_answers: questionnaireAnswers,
     provider: "gemini",
     model: process.env.GEMINI_MODEL || "gemini-3-flash-preview"
@@ -432,12 +533,14 @@ async function generateInfluencerCharacter(body) {
   const basePrompt = requiredText(body.prompt, "prompt");
   const characterId = slug(body.id || displayName);
   const aspectRatio = body.aspect_ratio || "9:16";
-  const imagePrompt = buildCharacterSheetPrompt(basePrompt, aspectRatio);
+  const attachments = normalizePromptAttachments(body.attachments);
+  const imagePrompt = buildCharacterSheetPrompt(mergeTextWithPromptAttachments(basePrompt, attachments), aspectRatio);
   const generatedSheets = [];
   for (let index = 1; index <= 4; index += 1) {
     generatedSheets.push(await generateGeminiCharacterSheet({
       characterId,
       prompt: buildCharacterSheetVariantPrompt(imagePrompt, index, 4),
+      attachments,
       variantIndex: index
     }));
   }
@@ -466,6 +569,7 @@ async function generateInfluencerCharacter(body) {
       aspect_ratio: aspectRatio,
       prompt: basePrompt,
       expanded_image_prompt: imagePrompt,
+      attachment_count: attachments.length,
       note: "Generated as a local character sheet. Publish it before Kling video generation so Kling can fetch the image over HTTPS."
     },
     created_at: new Date().toISOString()
@@ -485,7 +589,7 @@ async function generateInfluencerCharacter(body) {
   };
 }
 
-async function generateGeminiCharacterSheet({ characterId, prompt, variantIndex = 1 }) {
+async function generateGeminiCharacterSheet({ characterId, prompt, attachments = [], variantIndex = 1 }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("Set GEMINI_API_KEY in .env to generate character sheets");
@@ -499,7 +603,7 @@ async function generateGeminiCharacterSheet({ characterId, prompt, variantIndex 
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }]
+      contents: [{ parts: buildGeminiParts(prompt, attachments) }]
     })
   });
 
@@ -529,6 +633,263 @@ async function generateGeminiCharacterSheet({ characterId, prompt, variantIndex 
     public_url: `/${relativeDir}/${filename}`,
     response_text: parts.filter((part) => part.text).map((part) => part.text).join("\n")
   };
+}
+
+async function fetchElevenLabsVoices() {
+  const response = await fetch("https://api.elevenlabs.io/v1/voices", {
+    method: "GET",
+    headers: {
+      "xi-api-key": elevenLabsApiKey()
+    }
+  });
+
+  const text = await response.text();
+  const body = text ? safeJson(text) : null;
+  if (!response.ok) {
+    throw new Error(`ElevenLabs voices API ${response.status} ${response.statusText}: ${typeof body === "object" ? JSON.stringify(body) : text}`);
+  }
+
+  return {
+    provider: "elevenlabs",
+    voices: Array.isArray(body?.voices) ? body.voices : []
+  };
+}
+
+async function buildGeminiVoiceDescription(body) {
+  const characterId = requiredText(body.character_id, "character_id");
+  const character = await loadCharacterDraft(characterId);
+  const videoPrompt = String(body.video_prompt || "").trim();
+  const generatedVideoUrl = String(body.generated_video_url || "").trim();
+  const dialogue = String(body.dialogue || "").trim();
+  const attachments = normalizePromptAttachments(body.attachments);
+  const previewText = dialogue || extractDialoguePreview(videoPrompt) || "Mumbai is not just a city. It is a feeling, chaotic, beautiful, and deeply intimate. This city made me who I am today.";
+
+  const instruction = [
+    "You are a senior voice casting director and ElevenLabs Voice Design prompt engineer.",
+    "Generate a highly granular voice_description for the ElevenLabs Voice Design API.",
+    "Follow this exact structure:",
+    "Native <Language>. <Gender>, <Age range>. <Quality level>.",
+    "Persona: <2-5 words>. Emotion: <2-3 adjectives>.",
+    "<1-2 sentences about timbre, pacing, delivery>.",
+    "Use specific vocal descriptors for timbre, age, accent, texture, rhythm, and delivery.",
+    "Match the voice to the character's appearance, likely persona, video direction, and preview text tone.",
+    "Do not include stage directions, markdown, quotes, labels beyond Persona and Emotion, or more than 90 words.",
+    "Return strict JSON only with this shape: {\"voice_description\":\"...\",\"preview_text\":\"...\"}"
+  ].join(" ");
+
+  try {
+    const text = await callGeminiText({
+      instruction,
+      prompt: JSON.stringify({
+        character: summarizeCharacterForPrompt(character),
+        selected_character_sheet: character.character_sheet_url || character.selected_character_sheet_url || "",
+        video_prompt: videoPrompt,
+        generated_video_url: generatedVideoUrl,
+        existing_dialogue: dialogue,
+        recommended_preview_text: previewText,
+        attached_references: summarizePromptAttachments(attachments)
+      }, null, 2),
+      temperature: 0.58
+    });
+    const parsed = parseJsonObject(text);
+    if (parsed?.voice_description) {
+      return {
+        provider: "gemini",
+        model: process.env.GEMINI_MODEL || "gemini-3-flash-preview",
+        voice_description: String(parsed.voice_description).trim(),
+        preview_text: String(parsed.preview_text || previewText).trim()
+      };
+    }
+  } catch (error) {
+    console.warn(`Gemini voice description fallback: ${error.message}`);
+  }
+
+  return {
+    provider: "local_fallback",
+    model: null,
+    voice_description: fallbackVoiceDescription(character, videoPrompt),
+    preview_text: previewText
+  };
+}
+
+function fallbackVoiceDescription(character, videoPrompt) {
+  const context = `${character?.generation?.prompt || ""} ${character?.persona || ""} ${videoPrompt || ""}`.toLowerCase();
+  const female = /\bfemale\b|\bwoman\b|\bgirl\b|\bshe\b|\bher\b/.test(context);
+  const male = /\bmale\b|\bman\b|\bboy\b|\bhe\b|\bhis\b/.test(context);
+  const gender = female && !male ? "Female" : male && !female ? "Male" : "Female";
+  const language = /hindi|mumbai|indian|india|marathi/.test(context) ? "English with light Indian English phrasing" : "English";
+  return [
+    `Native ${language}. ${gender}, in her mid 20s. Perfect audio quality.`,
+    "Persona: Premium lifestyle creator. Emotion: Warm, confident, intimate.",
+    "She speaks with a smooth, clear, medium-pitched voice at a relaxed and conversational pace, with crisp diction and subtle cinematic warmth.",
+    "Her delivery feels natural, polished, and emotionally grounded, never robotic, cartoonish, or overly announcer-like."
+  ].join(" ");
+}
+
+function extractDialoguePreview(videoPrompt) {
+  const quoted = String(videoPrompt || "").match(/"([^"]{12,220})"/);
+  return quoted?.[1] || "";
+}
+
+function normalizePromptAttachments(attachments) {
+  if (!Array.isArray(attachments)) return [];
+  return attachments.slice(0, 6).map((attachment) => ({
+    name: String(attachment?.name || "attachment").slice(0, 160),
+    type: String(attachment?.type || "application/octet-stream").slice(0, 80),
+    size: Number(attachment?.size || 0),
+    kind: String(attachment?.kind || "file").slice(0, 20),
+    data_url: typeof attachment?.data_url === "string" && attachment.data_url.length < 12_000_000 ? attachment.data_url : "",
+    skipped_data: Boolean(attachment?.skipped_data),
+    note: String(attachment?.note || "").slice(0, 220)
+  }));
+}
+
+function mergeTextWithPromptAttachments(text, attachments) {
+  const summary = summarizePromptAttachments(attachments);
+  return summary ? `${String(text || "").trim()}\n\nATTACHED REFERENCE CONTEXT:\n${summary}` : String(text || "").trim();
+}
+
+function summarizePromptAttachments(attachments) {
+  return (attachments || []).map((attachment, index) => {
+    const kb = Math.max(1, Math.round(Number(attachment.size || 0) / 1024));
+    const visible = attachment.data_url && attachment.kind === "image" ? "image data included for Gemini vision" : "metadata only";
+    return `${index + 1}. ${attachment.kind || "file"} reference "${attachment.name}" (${attachment.type}, ${kb} KB, ${visible}). ${attachment.note || ""}`.trim();
+  }).join("\n");
+}
+
+function buildGeminiParts(prompt, attachments) {
+  const parts = [{ text: prompt }];
+  for (const attachment of attachments || []) {
+    if (attachment.kind !== "image" || !attachment.data_url) continue;
+    const inline = parseDataUrl(attachment.data_url);
+    if (!inline) continue;
+    parts.push({
+      inlineData: {
+        mimeType: inline.mimeType,
+        data: inline.data
+      }
+    });
+  }
+  return parts;
+}
+
+function parseDataUrl(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return {
+    mimeType: match[1],
+    data: match[2]
+  };
+}
+
+async function designElevenLabsVoice({ voiceDescription, text }) {
+  const response = await fetch("https://api.elevenlabs.io/v1/text-to-voice/design", {
+    method: "POST",
+    headers: {
+      "xi-api-key": elevenLabsApiKey(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      voice_description: voiceDescription,
+      text
+    })
+  });
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(`ElevenLabs voice design API ${response.status} ${response.statusText}: ${body ? JSON.stringify(body) : ""}`);
+  }
+
+  return {
+    provider: "elevenlabs",
+    previews: normalizeVoiceDesignPreviews(body)
+  };
+}
+
+async function saveElevenLabsDesignedVoice({ generatedVoiceId, voiceName, voiceDescription }) {
+  const response = await fetch("https://api.elevenlabs.io/v1/text-to-voice", {
+    method: "POST",
+    headers: {
+      "xi-api-key": elevenLabsApiKey(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      generated_voice_id: generatedVoiceId,
+      voice_name: voiceName,
+      voice_description: voiceDescription
+    })
+  });
+
+  const text = await response.text();
+  const body = text ? safeJson(text) : null;
+  if (!response.ok) {
+    throw new Error(`ElevenLabs save designed voice API ${response.status} ${response.statusText}: ${typeof body === "object" ? JSON.stringify(body) : text}`);
+  }
+
+  return {
+    provider: "elevenlabs",
+    voice_id: body?.voice_id || body?.voice?.voice_id || generatedVoiceId,
+    name: body?.name || body?.voice_name || voiceName,
+    response: body
+  };
+}
+
+function normalizeVoiceDesignPreviews(body) {
+  const previews = Array.isArray(body?.previews)
+    ? body.previews
+    : Array.isArray(body?.voice_previews)
+      ? body.voice_previews
+      : Array.isArray(body?.voices)
+        ? body.voices
+        : [];
+
+  return previews.map((preview, index) => {
+    const audioBase64 = preview.audio_base_64 || preview.audio_base64 || preview.audio || "";
+    const mediaType = preview.media_type || preview.mime_type || "audio/mpeg";
+    const generatedVoiceId = preview.generated_voice_id || preview.voice_id || preview.id || `preview-${index + 1}`;
+    return {
+      generated_voice_id: generatedVoiceId,
+      duration_secs: preview.duration_secs || preview.duration_seconds || null,
+      media_type: mediaType,
+      audio_url: audioBase64 ? `data:${mediaType};base64,${audioBase64}` : preview.preview_url || ""
+    };
+  }).filter((preview) => preview.generated_voice_id && preview.audio_url);
+}
+
+async function generateElevenLabsSpeech({ voiceId, text }) {
+  const safeVoiceId = requiredText(voiceId, "voice_id");
+  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(safeVoiceId)}`, {
+    method: "POST",
+    headers: {
+      "xi-api-key": elevenLabsApiKey(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      text,
+      model_id: process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2",
+      voice_settings: {
+        stability: Number(process.env.ELEVENLABS_STABILITY || 0.5),
+        similarity_boost: Number(process.env.ELEVENLABS_SIMILARITY_BOOST || 0.75)
+      }
+    })
+  });
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!response.ok) {
+    const detail = buffer.toString("utf8");
+    throw new Error(`ElevenLabs text-to-speech API ${response.status} ${response.statusText}: ${detail}`);
+  }
+  return buffer;
+}
+
+function elevenLabsApiKey() {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    const error = new Error("Set ELEVENLABS_API_KEY in .env to use audio generation");
+    error.statusCode = 400;
+    throw error;
+  }
+  return apiKey;
 }
 
 function buildCharacterSheetPrompt(basePrompt, aspectRatio) {
@@ -614,6 +975,11 @@ function parseJsonObject(text) {
   }
 }
 
+function extractScriptFromPrompt(prompt) {
+  const match = String(prompt || "").match(/\[SCRIPT\]\s*([\s\S]*)$/i);
+  return match ? match[1].trim() : "";
+}
+
 function summarizeCharacterForPrompt(character) {
   return {
     id: character.id,
@@ -627,16 +993,11 @@ function summarizeCharacterForPrompt(character) {
 
 function fallbackDirectorQuestions() {
   return [
-    { id: "location", question: "Where exactly is the influencer standing or moving?", hint: "Example: Marine Drive at sunset, luxury cafe, studio, airport lounge." },
-    { id: "emotion", question: "What should the viewer feel by the end of the 10 seconds?", hint: "Aspirational, intimate, energetic, mysterious, premium, emotional." },
-    { id: "message", question: "What is the one core message or line the influencer must communicate?", hint: "Keep it short enough for 10 seconds." },
-    { id: "dialogue", question: "Should the influencer speak? If yes, what exact words or style of dialogue?", hint: "Exact lines, Hindi/English mix, no speech, or natural VO." },
-    { id: "action", question: "What physical action should happen on screen?", hint: "Walking toward camera, looking at sea, adjusting jacket, smiling, turning." },
-    { id: "camera", question: "What camera feel do you want?", hint: "Handheld, locked-off, slow push-in, side pan, rack focus, close-up heavy." },
-    { id: "shots", question: "Which shot types are allowed or forbidden?", hint: "Medium close-up only, no wide shots, face always sharp." },
-    { id: "lighting", question: "What lighting and color grade should it have?", hint: "Golden hour, neon night, soft studio, warm cinematic, cool editorial." },
-    { id: "environment_audio", question: "What ambience or audio should be present?", hint: "Sea waves, cafe ambience, traffic, clean dialogue, no music." },
-    { id: "avoid", question: "What should the model avoid at all costs?", hint: "Extra people, logos, face blur, subtitles, jump cuts, distorted hands." }
+    { id: "presenter", question: "Who is the presenter, and what should they look like?", hint: "Include ethnicity, hair color/style, age range, and notable features if not already clear from the selected character." },
+    { id: "script_topic", question: "What is the exact script, or what topic and key points should the presenter cover?", hint: "Paste the script or list the main points for Gemini to write naturally." },
+    { id: "tone_use_case", question: "What tone and use case should this talking-head video have?", hint: "Example: calm LinkedIn founder update, conversational YouTube intro, authoritative training video, ad read." },
+    { id: "target_length", question: "What target video length do you want?", hint: "Example: 30s, 60s, 90s, or 2 minutes." },
+    { id: "wardrobe", question: "What clothing should match the use case and tone?", hint: "Example: smart blazer, premium casual top, neutral studio outfit, brand colors." }
   ];
 }
 

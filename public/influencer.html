@@ -31,6 +31,7 @@
       <button class="workflowTab" type="button" data-target="#section-direction"><span>2</span>Direction</button>
       <button class="workflowTab" type="button" data-target="#section-prompt-review"><span>3</span>Prompt Review</button>
       <button class="workflowTab" type="button" data-target="#section-kling-render"><span>4</span>Kling Render</button>
+      <button class="workflowTab" type="button" data-target="#section-audio-generation"><span>5</span>Voice Audio</button>
     </nav>
 
     <section id="section-character-sheet" class="stepPanel characterGenerateStep reveal">
@@ -47,16 +48,72 @@
           Character name
           <input id="generatedCharacterName" autocomplete="off" placeholder="Mumbai Creator" />
         </label>
+        <div class="promptBuilder">
+          <div class="miniHeader">Character prompt builder</div>
+          <div class="builderGrid">
+            <label>
+              Age
+              <input id="builderAge" autocomplete="off" value="25" />
+            </label>
+            <label>
+              Nationality / ethnicity
+              <input id="builderEthnicity" autocomplete="off" value="Macedonian" />
+            </label>
+            <label>
+              Gender
+              <select id="builderGender">
+                <option value="woman" selected>Woman</option>
+                <option value="man">Man</option>
+                <option value="person">Person</option>
+              </select>
+            </label>
+            <label>
+              Face
+              <input id="builderFace" autocomplete="off" value="elegant oval face, warm brown eyes, and a confident soft smile" />
+            </label>
+            <label>
+              Hair
+              <input id="builderHair" autocomplete="off" value="dark hair styled in a neat low bun with a visible side part and natural stray flyaways" />
+            </label>
+            <label>
+              Body type
+              <input id="builderBody" autocomplete="off" value="curvy, thick, and fit physique with realistic body proportions" />
+            </label>
+            <label>
+              Outfit
+              <input id="builderOutfit" autocomplete="off" value="simple black low-neck satin dress showing natural fabric creasing" />
+            </label>
+            <label>
+              Accessories
+              <input id="builderAccessories" autocomplete="off" value="classic gold hoop earrings" />
+            </label>
+          </div>
+          <div class="actions">
+            <button id="buildCharacterPromptButton" class="btn-secondary" type="button">Build 3x3 prompt</button>
+            <span class="mutedSmall">Fill the short fields, then generate the full reference-sheet prompt.</span>
+          </div>
+        </div>
         <label>
           Character prompt
-          <textarea id="characterPrompt" rows="8">Create a hyper-realistic photographic character reference sheet for a synthetic Indian female AI influencer in her mid 20s. She must look like a real person photographed in a professional studio, not CGI, not illustration, not a beauty render. She has an elegant oval face, warm brown eyes, natural facial asymmetry, realistic pores, tiny skin texture variations, soft under-eye detail, neatly styled dark hair in a low bun with a side part, subtle premium makeup, confident soft smile, and gold hoop earrings. She wears a ruby red high-neck satin dress with a clean modern silhouette, the character should be curvy and thick and fit.
+          <textarea id="characterPrompt" rows="8">A 3x3 grid layout containing 9 separate, highly consistent, unretouched DSLR photographic panels on a single clean, solid off-white studio sheet. Each panel features the exact same 25-year-old Macedonian woman with an elegant oval face, warm brown eyes, and a confident soft smile. Her dark hair is styled in a neat low bun with a visible side part and natural stray flyaways. She maintains a curvy, thick, and fit physique with realistic body proportions across all views, wearing a simple black low-neck satin dress showing natural fabric creasing and classic gold hoop earrings.
 
-Show the exact same character in multiple consistent angles on one clean white studio sheet: front-facing portrait, left three-quarter view, right three-quarter view, full side profile, back view, waist-up medium shot, full-body standing shot, close-up face detail, and eye/detail close-up. Keep face, hair, skin tone, outfit, earrings, and body proportions identical across every angle.
+The top row (Row 1, Panels 1-3) features strict close-up headshots: 1. Straight-on frontal face detail, 2. Left three-quarter face detail, 3. Full side profile face detail. These close-ups emphasize high-resolution skin texture with visible pores, natural facial asymmetry, subtle moles, fine lines around the eyes, natural under-eye shadows, and slight micro-sweat sheen.
 
-Style: full-frame DSLR photography, 85mm portrait lens, realistic depth of field, softbox studio lighting, true-to-life skin tones, photographic skin texture, natural human proportions, sharp facial detail, clean reference-sheet layout, high identity consistency.
+The middle row (Row 2, Panels 4-6) features medium waist-up portraits: 4. Straight-on frontal medium shot, 5. Right three-quarter medium shot, 6. Full side profile medium shot. These panels show the full hairstyle, dress silhouette, and consistent upper-body proportions.
 
-Do not add any text, labels, captions, logos, watermarks, social handles, icons, UI elements, borders, or decorative graphics. No extra people. No duplicate identities. No distorted hands. No cartoon style. No anime. No 3D render. No plastic skin. No doll-like face. No airbrushed CGI look. No exaggerated eyes.</textarea>
+The bottom row (Row 3, Panels 7-9) features full-body and alternative angles:
+7. [CRUCIAL PANEL]: A perfectly symmetrical, straight-on frontal full-body standing shot, arms resting naturally at her sides, head facing directly forward, ensuring her identical facial features and thick fit proportions remain perfectly sharp and proportional from head to toe,
+8. Left three-quarter full-body standing shot,
+9. Straight back view showing the full back silhouette, hairstyle, and fit posture.
+
+The lighting throughout all 9 panels is consistent, clean overhead softbox lighting that creates realistic, natural shadows to define facial and body structure without washing out details. Sharp focus across all panels using an 85mm lens at f/4 to prevent distortion and maintain a natural, subtle depth of field. Absolutely no text, no labels, no grid lines, no watermarks, no borders, no CGI elements, no 3D rendering, no airbrushed skin, and no digital smoothing on any panel.</textarea>
         </label>
+        <label class="attachmentField">
+          Attach image/video references
+          <input id="characterPromptAttachments" type="file" accept="image/*,video/*" multiple />
+          <span class="hint">Optional. Use references for styling, character mood, outfit, location, or visual tone.</span>
+        </label>
+        <div id="characterPromptAttachmentList" class="attachmentList"></div>
         <label>
           Image aspect ratio
           <select id="characterAspectRatio">
@@ -151,6 +208,12 @@ Do not add any text, labels, captions, logos, watermarks, social handles, icons,
           Basic video idea
           <textarea id="basicPrompt" rows="8">Mumbai sea-facing intro where the influencer talks about how the city shaped her.</textarea>
         </label>
+        <label class="attachmentField">
+          Attach image/video references
+          <input id="basicPromptAttachments" type="file" accept="image/*,video/*" multiple />
+          <span class="hint">Optional. Add moodboards, locations, frame references, or video examples for direction.</span>
+        </label>
+        <div id="basicPromptAttachmentList" class="attachmentList"></div>
         <div class="actions">
           <button id="askQuestionsButton" class="btn-secondary" type="button">Ask direction questions</button>
           <button class="primary btn-primary" type="submit">Build cinematic prompt</button>
@@ -180,6 +243,12 @@ Do not add any text, labels, captions, logos, watermarks, social handles, icons,
         Cinematic video prompt
         <textarea id="expandedPrompt" rows="18" placeholder="Your expanded prompt will appear here."></textarea>
       </label>
+      <label class="attachmentField">
+        Attach final render references
+        <input id="expandedPromptAttachments" type="file" accept="image/*,video/*" multiple />
+        <span class="hint">Optional. These references are included as prompt context before Kling submission.</span>
+      </label>
+      <div id="expandedPromptAttachmentList" class="attachmentList"></div>
 
       <div id="shotBreakdown" class="shotBreakdown"></div>
     </section>
@@ -202,6 +271,108 @@ Do not add any text, labels, captions, logos, watermarks, social handles, icons,
         <button id="generateVideoButton" class="primary btn-primary" type="button">Generate video</button>
         <span id="spinner" class="spinner hidden" aria-hidden="true"></span>
         <span id="statusText" class="statusText">Ready</span>
+      </div>
+    </section>
+
+    <section id="section-audio-generation" class="stepPanel audioStep reveal">
+      <div class="stepHeader">
+        <span class="stepNumber">5</span>
+        <div>
+          <h2>Voice Audio</h2>
+          <p>Select an ElevenLabs voice, generate matching dialogue audio, and keep it ready for the future lip-sync step.</p>
+        </div>
+      </div>
+
+      <div class="audioPhase">
+        <div class="miniHeader">Voice selection</div>
+        <div class="segmented audioModeSwitch" role="tablist" aria-label="Voice source">
+          <button id="voiceExistingMode" class="active btn-secondary" type="button">Choose existing</button>
+          <button id="voiceDesignMode" class="btn-secondary" type="button">Design voice</button>
+        </div>
+
+        <div id="existingVoicePanel" class="stack">
+        <div class="actions">
+          <button id="loadVoicesButton" class="btn-secondary" type="button">Load ElevenLabs voices</button>
+          <span id="voiceStatusText" class="statusText">Voices not loaded</span>
+        </div>
+        <div id="voiceGrid" class="voiceGrid"></div>
+        <div id="voiceConfirmPanel" class="actions hidden">
+          <button id="confirmVoiceButton" class="primary btn-primary" type="button">Confirm voice</button>
+          <span id="selectedVoiceText" class="mutedSmall"></span>
+        </div>
+        </div>
+
+        <form id="voiceDesignForm" class="stack hidden">
+          <label>
+            Voice design prompt
+            <textarea id="voiceDesignPrompt" rows="7" placeholder="Describe the voice that matches this influencer."></textarea>
+          </label>
+          <label class="attachmentField">
+            Attach image/video references
+            <input id="voiceDesignPromptAttachments" type="file" accept="image/*,video/*" multiple />
+            <span class="hint">Optional. Use character clips or images to guide Gemini's voice-description context.</span>
+          </label>
+          <div id="voiceDesignPromptAttachmentList" class="attachmentList"></div>
+          <label>
+            Preview text
+            <textarea id="voicePreviewText" rows="4">Mumbai is not just a city. It is a feeling, chaotic, beautiful, and deeply intimate. This city made me who I am today.</textarea>
+          </label>
+          <label>
+            Saved voice name
+            <input id="designedVoiceName" autocomplete="off" placeholder="Mumbai Creator Voice" />
+          </label>
+          <div class="actions">
+            <button id="designVoiceButton" class="primary btn-primary" type="submit">Design voice previews</button>
+            <span id="voiceDesignSpinner" class="spinner hidden" aria-hidden="true"></span>
+            <span id="voiceDesignStatusText" class="statusText">Ready</span>
+          </div>
+          <div id="voiceDesignGrid" class="voiceGrid"></div>
+          <div id="voiceDesignConfirmPanel" class="actions hidden">
+            <button id="saveDesignedVoiceButton" class="primary btn-primary" type="button">Save selected voice</button>
+            <span id="selectedDesignedVoiceText" class="mutedSmall"></span>
+          </div>
+        </form>
+      </div>
+
+      <form id="audioForm" class="audioPhase stack hidden">
+        <label>
+          Enter the exact dialogue spoken in the video
+          <textarea id="dialogueInput" rows="7" placeholder="Write the exact words the influencer should speak."></textarea>
+        </label>
+        <div class="audioReference">
+          <strong>Current video duration</strong>
+          <span id="videoDurationText">No video loaded yet</span>
+          <p>Your audio length should match the video length.</p>
+        </div>
+        <div class="actions">
+          <button id="generateAudioButton" class="primary btn-primary" type="submit">Generate audio</button>
+          <span id="audioSpinner" class="spinner hidden" aria-hidden="true"></span>
+          <span id="audioStatusText" class="statusText">Ready</span>
+        </div>
+      </form>
+
+      <div id="audioPreviewPanel" class="audioPhase hidden">
+        <div class="miniHeader">Audio preview</div>
+        <audio id="audioPlayer" controls></audio>
+        <div id="durationSyncPanel" class="durationSyncPanel">
+          <div>
+            <strong>Video</strong>
+            <span id="syncVideoDurationText">--</span>
+          </div>
+          <div>
+            <strong>Audio</strong>
+            <span id="syncAudioDurationText">--</span>
+          </div>
+          <div>
+            <strong>Difference</strong>
+            <span id="syncDifferenceText">--</span>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="regenerateAudioButton" class="btn-secondary" type="button">Regenerate</button>
+          <button id="confirmAudioButton" class="primary btn-primary" type="button">Confirm & proceed</button>
+          <span id="audioConfirmText" class="mutedSmall">Audio and video URLs will stay available for the next sync step.</span>
+        </div>
       </div>
     </section>
   </main>

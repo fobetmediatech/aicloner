@@ -256,7 +256,7 @@ h1:hover {
 
 .workflowTab {
   position: relative;
-  flex: 1 1 20%;
+  flex: 1 1 16.66%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -407,6 +407,7 @@ h1:hover {
 .promptStep { grid-column: 2; }
 .reviewStep { grid-column: 3; }
 .generateStep { grid-column: 2 / -1; }
+.audioStep { grid-column: 1 / -1; }
 
 .stepHeader {
   display: flex;
@@ -434,6 +435,29 @@ p {
 .stack {
   display: grid;
   gap: 16px;
+}
+
+.promptBuilder {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(201, 168, 76, 0.18);
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    rgba(6, 10, 26, 0.42);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.builderGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.builderGrid input,
+.builderGrid select {
+  min-height: 42px;
 }
 
 label {
@@ -651,6 +675,80 @@ button:not(.primary):not(.workflowTab):not(.btn-danger):hover,
   background: rgba(201, 168, 76, 0.04);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.attachmentField {
+  gap: 8px;
+}
+
+.attachmentField .hint {
+  padding: 9px 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.attachmentList {
+  display: grid;
+  gap: 8px;
+}
+
+.attachmentChip {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 10px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), transparent 45%),
+    rgba(6, 10, 26, 0.42);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.attachmentChip img,
+.attachmentIcon {
+  width: 48px;
+  height: 42px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(3, 4, 10, 0.76);
+}
+
+.attachmentIcon {
+  display: grid;
+  place-items: center;
+  color: var(--gold-primary);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.attachmentChip strong,
+.attachmentChip small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentChip strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.attachmentChip small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.attachmentChip button {
+  min-height: 30px;
+  padding: 7px 9px;
+  font-size: 10px;
 }
 
 .questionnairePanel {
@@ -1004,6 +1102,172 @@ button:not(.primary):not(.workflowTab):not(.btn-danger):hover,
   text-transform: uppercase;
 }
 
+.audioStep {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.92fr) minmax(360px, 1.08fr);
+  gap: 22px;
+}
+
+.audioStep .stepHeader {
+  grid-column: 1 / -1;
+}
+
+.audioPhase {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), transparent 42%),
+    rgba(6, 10, 26, 0.4);
+  backdrop-filter: blur(22px) saturate(1.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.voiceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+  max-height: 440px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.voiceCard {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(201, 168, 76, 0.12);
+  border-radius: 10px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), transparent 44%),
+    rgba(3, 4, 10, 0.58);
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.voiceCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(201, 168, 76, 0.5);
+  box-shadow: 0 0 24px rgba(201, 168, 76, 0.1);
+}
+
+.voiceCard.selected {
+  border-color: #e5ebf5;
+  box-shadow: inset 0 0 18px rgba(229, 235, 245, 0.1), 0 0 26px rgba(208, 218, 232, 0.2);
+}
+
+.voiceCard strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.voiceCard span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.voiceCard audio {
+  width: 100%;
+  min-height: 38px;
+  color-scheme: dark;
+}
+
+.voiceActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.voiceActions button {
+  min-height: 32px;
+  padding: 8px 10px;
+  font-size: 10px;
+}
+
+.audioModeSwitch {
+  margin-bottom: 0;
+}
+
+.audioReference {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(201, 168, 76, 0.24);
+  border-radius: 8px;
+  background: rgba(201, 168, 76, 0.04);
+}
+
+.audioReference strong {
+  color: var(--gold-primary);
+  font-size: 12px;
+}
+
+.audioReference span {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.audioReference p {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+#audioPlayer {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 8px;
+  color-scheme: dark;
+}
+
+.durationSyncPanel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 10px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    rgba(6, 10, 26, 0.46);
+}
+
+.durationSyncPanel div {
+  display: grid;
+  gap: 4px;
+}
+
+.durationSyncPanel strong {
+  color: var(--gold-primary);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.durationSyncPanel span {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.durationSyncPanel.matched {
+  border-color: rgba(118, 220, 155, 0.45);
+  box-shadow: inset 0 0 18px rgba(118, 220, 155, 0.08);
+}
+
+.durationSyncPanel.mismatch {
+  border-color: rgba(255, 107, 107, 0.42);
+  box-shadow: inset 0 0 18px rgba(255, 107, 107, 0.08);
+}
+
 .statusText {
   display: inline-flex;
   align-items: center;
@@ -1141,7 +1405,8 @@ body.cursor-hover #platinumCursor {
 
   .characterGenerateStep,
   .reviewStep,
-  .generateStep {
+  .generateStep,
+  .audioStep {
     grid-column: 1 / -1;
   }
 
@@ -1191,6 +1456,10 @@ body.cursor-hover #platinumCursor {
     grid-template-columns: 1fr;
   }
 
+  .audioStep {
+    grid-template-columns: 1fr;
+  }
+
   .characterGenerateStep .stepHeader,
   .characterGenerateStep form,
   .characterGenerateStep .publishPanel,
@@ -1200,6 +1469,18 @@ body.cursor-hover #platinumCursor {
   }
 
   .imageGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .voiceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .builderGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .durationSyncPanel {
     grid-template-columns: 1fr;
   }
 
